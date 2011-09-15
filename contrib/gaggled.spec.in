@@ -1,0 +1,45 @@
+
+Name:		gaggled
+Version:	@PACKAGE_VERSION@
+Release:	0%{?dist}
+Summary:	gaggled process manager
+Group:		System Environment/Daemons
+License:	ASL 2.0
+URL:		https://github.com/ZenFire/gaggled
+Source0:	%{name}-%{version}.tar.bz2
+BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+%description
+Gaggled is a process manager focused on inter-process dependencies within a
+system with an eye to developing cluster-level process management later (with
+equivalent semantics for process dependency).
+
+%prep
+%setup -q
+
+%build
+cd gaggled/build
+cmake \
+  -DCMAKE_SKIP_RPATH=ON \
+  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+  ..
+
+%{__make} %{?jobs:-j%jobs}
+
+%install
+rm -rf $RPM_BUILD_ROOT
+cd gaggled/build
+make install DESTDIR=%{buildroot}
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+
+%files
+%defattr(-,root,root,-)
+%{_bindir}/gaggled
+
+%changelog
+* Fri Jun 24 2011 Matt Griswold <matt@bigwells.net> 0.1.0-0
+- initial create
+

@@ -1,0 +1,16 @@
+<protocol module="gaggled_control" type="reqrep" timeout="yes">
+  <wire version="5235" />
+
+  <varchar name="progname" max="255" />
+  
+  <boundedlist name="prognamelist" max="64" of="progname" />
+
+  <complex name="ProgramStates">
+    <field name="up" type="prognamelist" />
+    <field name="down" type="prognamelist" />
+  </complex>
+
+	<function name="start" in="progname" out="uint8_t" />
+	<function name="stop" in="progname" out="uint8_t" />
+  <function name="getstate" in="uint8_t" comment="TODO make in=void" out="ProgramStates" />
+</protocol>

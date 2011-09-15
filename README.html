@@ -1,0 +1,185 @@
+<p><strong><a href="#toc1-1">Purpose</a></strong></p>
+
+<p><strong><a href="#toc1-5">Building</a></strong></p>
+
+<p><strong><a href="#toc1-16">Platforms</a></strong>
+&emsp;<a href="#toc2-21">Known to Work</a>
+&emsp;<a href="#toc2-27">Might Work, Untested</a>
+&emsp;<a href="#toc2-33">Not Expected to Work</a></p>
+
+<p><strong><a href="#toc1-38">Dependencies</a></strong></p>
+
+<p><strong><a href="#toc1-46">Concepts / Configuration</a></strong>
+&emsp;<a href="#toc2-49">Global Settings</a>
+&emsp;<a href="#toc2-73">Dependency Rules: Disallowed Configurations</a></p>
+
+<p><strong><a href="#toc1-82">Internals</a></strong>
+&emsp;<a href="#toc2-85">Stopping Programs</a></p>
+
+<p><strong><a href="#toc1-90">Usage</a></strong></p>
+
+<p><strong><a href="#toc1-97">Listener and Controller</a></strong>
+&emsp;<a href="#toc2-102">Listener</a>
+&emsp;<a href="#toc2-107">Controller</a></p>
+
+<p><strong><a href="#toc1-112">Caveats</a></strong>
+<A name="toc1-1" title="Purpose" /></p>
+
+<h1>Purpose</h1>
+
+<p><strong>gaggled</strong> is a process manager focused on inter-process dependencies within a system with an eye to developing cluster-level process management later (with equivalent semantics for process dependency).  It is currently in development and bug reports are welcome at https://github.com/ZenFire/gaggled if you find anything wrong.  Reports of working/not working status on various platforms are also welcomed and encouraged.</p>
+
+<p><A name="toc1-5" title="Building" /></p>
+
+<h1>Building</h1>
+
+<p>To build gaggled, you must create a build directory, run cmake, and use make to build.  How to use the rpm build setup and how to install are to be covered later. Watch this space.</p>
+
+<pre><code>mkdir build
+cmake ..
+make -j4
+</code></pre>
+
+<p>You may be clever enough to just use <strong>gaggled</strong> right after building, but you're advised for security reasons to read this entire document, at the very least the Caveats section.</p>
+
+<p><A name="toc1-16" title="Platforms" /></p>
+
+<h1>Platforms</h1>
+
+<p><strong>gaggled</strong> has been tested on a few platforms, and is expected to work on all relatively recent Linux distributions.</p>
+
+<p><A name="toc2-21" title="Known to Work" /></p>
+
+<h2>Known to Work</h2>
+
+<ul>
+<li>Centos 5</li>
+<li>Scientific Linux 6</li>
+</ul>
+
+<p><A name="toc2-27" title="Might Work, Untested" /></p>
+
+<h2>Might Work, Untested</h2>
+
+<ul>
+<li>FreeBSD</li>
+<li>OSX</li>
+</ul>
+
+<p><A name="toc2-33" title="Not Expected to Work" /></p>
+
+<h2>Not Expected to Work</h2>
+
+<ul>
+<li>Any Windows systems (although this may work under Cygwin)</li>
+</ul>
+
+<p><A name="toc1-38" title="Dependencies" /></p>
+
+<h1>Dependencies</h1>
+
+<ul>
+<li>CMake 2.6 or later</li>
+<li>GCC 4.4 or later</li>
+<li>Boost 1.44</li>
+<li>ZeroMQ 2.1</li>
+</ul>
+
+<p><A name="toc1-46" title="Concepts / Configuration" /></p>
+
+<h1>Concepts / Configuration</h1>
+
+<p><A name="toc2-49" title="Global Settings" /></p>
+
+<h2>Global Settings</h2>
+
+<ul>
+<li><p>The section labelled <code>gaggled</code> contains several settings, all of which are optional.  The section itself is optional.</p>
+
+<ul>
+<li><code>killwait</code>: milliseconds to wait after sending SIGTERM to shut down a process before assuming it won't die and using SIGKILL. Default: 10000.</li>
+<li><code>startwait</code>: milliseconds to defer trying to start a program again after an instance where <strong>gaggled</strong> noted that the program's dependencies were not yet satisfied. Default: 100.</li>
+<li><code>tick</code>: the event loop timer: how long to sleep after an event loop in which no events were processed. Default: 10.</li>
+<li><code>path</code>: to prepend to $PATH for searching for programs. Do not end with a : unless you want to add the current directory to the search path. Optional.</li>
+<li><code>env</code>: an optional environment section.  Overlays over the global environment that <strong>gaggled</strong> was run in.</li>
+<li><code>eventurl</code>: a ZeroMQ URL to bind to, to publish up/down events to.</li>
+<li><code>controlurl</code>: a ZeroMQ URL to bind to, to process control and state-dump requests from.</li>
+</ul></li>
+<li><p>A <em>program</em> is a settings section.  It can have any arbitrary title, which is the name of the <em>program</em>.</p>
+
+<ul>
+<li><code>command</code>: for instance, <code>/usr/bin/sleep</code>. If it contains no slashes, [path:]$PATH will be searched for the command.</li>
+<li><code>argv</code>: for instance, <code>8h</code>. Defaults to empty.</li>
+<li><code>env</code>: config section, overlays the list of assignments onto gaggled's env for the program.</li>
+<li><code>respawn</code>: <code>true</code> if it should be restarted if it dies.  This defaults to <code>true</code>.</li>
+<li><code>enabled</code>: <code>true</code> if it should be started, <code>false</code> if it's disabled.  Defaults to <code>true</code>.</li>
+</ul></li>
+<li>A <em>dependency</em> represents that a <em>program</em> will start, not start, stop, or restart depending on the state of another <em>program</em>. A program will start if and when all dependencies are satisfied.  This is expressed as a collection of settings; dependency sections should be under the <code>depends</code> section under the program section they are dependencies of.  The name of a dependency section is the name of the <em>program</em> the dependency is <code>on</code>.
+<ul>
+<li><code>delay</code>: the program will not start until <code>on</code> has been running for <code>delay</code> milliseconds. Defaults to <code>0</code>.  Negative numbers or numbers over 2147483647 result in undefined behaviour.</li>
+<li><code>propagate</code>: if <code>on</code> restarts, <code>of</code> should restart as well.  Stop is initiated as soon as possible after <code>on</code> dies.  Starts as a result of this feature will obey <code>delay</code>.  Defaults to <code>false</code>.  Of course, if <code>on</code> has <code>respawn</code> turned off, <code>of</code> will not get started as <code>on</code> won't come back up.</li>
+</ul></li>
+</ul>
+
+<p>Some examples of <strong>gaggled</strong> config files are in the contrib/ directory.</p>
+
+<p><A name="toc2-73" title="Dependency Rules: Disallowed Configurations" /></p>
+
+<h2>Dependency Rules: Disallowed Configurations</h2>
+
+<p>There are some dependency configurations that are valid syntax, you may not express in the configuration of <strong>gaggled</strong>.  Doing so will result in <strong>gaggled</strong> failing to run or configest.</p>
+
+<ul>
+<li>dependency of an <code>enabled</code> <em>program</em> on a non-<code>enabled</code> program.</li>
+<li>missing any required setting</li>
+<li>circular dependencies: there can be no cycles in the dependency graph.  The graph is directed (<code>of</code> -> <code>on</code>), so it's possible to have a dependency set like (a -> b), (b -> c), (a -> c) which is not considered a cycle.  If you have one, then the programs in it would never start.</li>
+</ul>
+
+<p><A name="toc1-82" title="Internals" /></p>
+
+<h1>Internals</h1>
+
+<p><A name="toc2-85" title="Stopping Programs" /></p>
+
+<h2>Stopping Programs</h2>
+
+<p>During <strong>gaggled</strong> shutdown and in other scenarios, sometimes a program must be shut down.  This will work the same way <strong>init</strong> does it: use <code>SIGTERM</code>, if the process does not die within 10 seconds, <code>SIGKILL</code> will be sent.</p>
+
+<p><A name="toc1-90" title="Usage" /></p>
+
+<h1>Usage</h1>
+
+<ul>
+<li><code>-c</code> $FILE will use a specific config file.  This argument is required.</li>
+<li><code>-t</code> will check dependency rules and existence of all programs but not start <strong>gaggled</strong></li>
+<li><code>-h</code> to display help instead of running.</li>
+</ul>
+
+<p><A name="toc1-97" title="Listener and Controller" /></p>
+
+<h1>Listener and Controller</h1>
+
+<p>There are two utility programs included with <strong>gaggled</strong>.</p>
+
+<p><A name="toc2-102" title="Listener" /></p>
+
+<h2>Listener</h2>
+
+<p>The program <strong>gaggled_listener</strong> will connect to a gaggled instance that is configured with the <code>eventurl</code> option and display incoming program state changes messages as needed.  Use the -h option for help.</p>
+
+<p><A name="toc2-107" title="Controller" /></p>
+
+<h2>Controller</h2>
+
+<p>The program <strong>gaggled_controller</strong> will connect to a gaggled instance that is configured with the <code>controlurl</code> option and print program state, shut down programs, or start them up.  Use the <code>-h</code> option for help.</p>
+
+<p><A name="toc1-112" title="Caveats" /></p>
+
+<h1>Caveats</h1>
+
+<ul>
+<li>There is, at present, <strong>no security</strong> on the control or event channels. If you use <code>eventurl</code> or <code>controlurl</code>, transport restrictions such as firewalls and binding to localhost are the the only restriction on status information and up/down commands being interchanged.</li>
+<li>You must have a reliable system clock. startup sequences may not operate as expected if the system clock jumps forward or backward.  At the moment, timezone change/DST is untested.  Use UTC.  This is subject to change.</li>
+<li>using a large <code>startwait</code> or <code>tick</code> (compared to <code>delay</code> etc) can result in confusing behaviour (things taking longer to start or be recognized as stopped than expected)</li>
+<li>any program that uses the exit codes <code>EX_NOPERM</code>, <code>EX_DATAERR</code>, <code>EX_NOINPUT</code>, or <code>EX_UNAVAILABLE</code> (defined in sysexits.h for your system) may result in gaggled logging a specific type of execution failure that may not be accurate.</li>
+</ul>
