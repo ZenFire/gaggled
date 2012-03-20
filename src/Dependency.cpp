@@ -60,14 +60,17 @@ void gaggled::Dependency::link(Gaggled* g) {
   try {
     of = g->get_program(of_name);
   } catch (BadConfigException& bce) {
-    throw gaggled::BadConfigException("depedency of linkage failed: " + bce.reason);
+    throw gaggled::BadConfigException("dependency of linkage failed: " + bce.reason);
   }
   try {
     on = g->get_program(on_name);
+    // TODO update docs about depending on a disabled program, we sort of have to make that allowed now.
+    /*
     if (of->is_enabled() and not on->is_enabled())
       throw gaggled::BadConfigException("cannot depend on disabled program " + on->getName());
+    */
   } catch (BadConfigException& bce) {
-    throw gaggled::BadConfigException("depedency on linkage failed: " + bce.reason);
+    throw gaggled::BadConfigException("dependency on linkage failed: " + bce.reason);
   }
 
   // check now via BFS if we can reach 'of' by following outbound dependencies from 'on'; this means that we'll be creating
@@ -107,8 +110,8 @@ bool gaggled::Dependency::satisfied() {
 
 void gaggled::Dependency::prop_down(Gaggled* g) {
   if (this->propagate) {
-    // this dependency has propagation enabled, so we should create a conditional restarting kill event.
-    if (g->is_running() and this->of->is_enabled())
+    // this dependency has propagation turned on, so we should create a conditional restarting kill event.
+    if (g->is_running())
       new KillEvent(g, this->of, SIGTERM, true, false);
   }
 }

@@ -23,6 +23,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sysexits.h>
 #include <signal.h>
 #include <iostream>
@@ -35,19 +36,20 @@
 #define PTOK_INVAL 1
 unsigned long long gaggled::Program::instance_token = PTOK_INVAL + 1;
 
-gaggled::Program::Program(std::string name, std::string command, std::vector<std::string>* argv, std::map<std::string, std::string> own_env, bool respawn, bool enabled) :
+gaggled::Program::Program(std::string name, std::string command, std::vector<std::string>* argv, std::map<std::string, std::string> own_env, std::string wd, bool respawn, bool enabled) :
   name(name),
   command(command),
   argv(argv),
+  wd(wd),
   own_env(own_env),
   respawn(respawn),
-  enabled(enabled),
-  operator_shutdown(false),
+  operator_shutdown(!enabled),
   controlled_shutdown(false),
   running(false),
   prop_start(false),
   pid(0),
-  token(PTOK_INVAL)
+  token(PTOK_INVAL),
+  statechanges(0)
 {
   if (argv == NULL) {
     this->argv = new std::vector<std::string>();
@@ -153,7 +155,7 @@ std::string gaggled::Program::to_string() {
   for (auto i = this->argv->begin(); i != this->argv->end(); i++)
     r = r + " " + *i;
 
-  r = r + "] respawn:" + boost::lexical_cast<std::string>(this->respawn) + " enabled:" + boost::lexical_cast<std::string>(this->enabled);
+  r = r + "] respawn:" + boost::lexical_cast<std::string>(this->respawn) + " enabled:" + boost::lexical_cast<std::string>(!(this->operator_shutdown));
   r = r + " running:" + boost::lexical_cast<std::string>(this->running) + " pid:" + boost::lexical_cast<std::string>(this->pid);
   return r + " token:" + boost::lexical_cast<std::string>(this->token);
 }
@@ -166,12 +168,20 @@ void gaggled::Program::add_dependency(Dependency* d) {
   this->dependencies->push_back(d);
 }
 
-bool gaggled::Program::is_enabled() {
-  return this->enabled;
-}
-
 bool gaggled::Program::is_running() {
   return this->running;
+}
+
+pid_t gaggled::Program::get_pid() {
+  return this->pid;
+}
+
+std::string gaggled::Program::getDownType() {
+  return this->down_type;
+}
+
+uint64_t gaggled::Program::state_changes() {
+  return this->statechanges;
 }
 
 std::string gaggled::Program::get_command() {
@@ -194,6 +204,14 @@ void gaggled::Program::start(Gaggled* g) {
     bool err_perm = false;
     bool err_badbin = false;
     bool err_neverfound = true;
+
+    if (wd != "") {
+      if (chdir(wd.c_str()) != 0)
+        {
+        std::cout << "failed to chdir(\"" << wd << "\")... errno=" << errno << std::endl << std::flush;
+        exit(EX_UNAVAILABLE);
+        }
+    }
 
     for (auto c = commands.begin(); c != commands.end(); c++) {
       exec_argv[0] = strdup(c->c_str());
@@ -248,7 +266,9 @@ void gaggled::Program::start(Gaggled* g) {
     g->pid_map[pid] = this;
     this->pid = pid;
     this->token = gaggled::Program::instance_token++;
+    this->statechanges++;
     this->running = true;
+    this->down_type = "UNK";
     this->prop_start = false;
     if (gettimeofday(&(this->started), NULL) != 0)
       std::cout << "error: failed to gettimeofday(), timing behaviour warning." << std::endl;
@@ -256,7 +276,7 @@ void gaggled::Program::start(Gaggled* g) {
     std::cout << "forked for " << (*this) << std::endl;
 
     // broadcast the up state
-    g->broadcast_state(this, true);
+    g->broadcast_state(this);
   }
 }
 
@@ -315,7 +335,9 @@ void gaggled::Program::died(Gaggled* g, std::string down_type, int rcode) {
   g->pid_map.erase(this->pid);
   this->pid = 0;
   this->running = false;
+  this->down_type = down_type;
   this->token = PTOK_INVAL;
+  this->statechanges++;
 
   switch (rcode) {
     case EX_NOPERM:
@@ -333,7 +355,7 @@ void gaggled::Program::died(Gaggled* g, std::string down_type, int rcode) {
   }
 
   // broadcast the down state
-  g->broadcast_state(this, false, controlled_shutdown, down_type);
+  g->broadcast_state(this);
 
   // if respawn and/or prop_start from a previous kill, start now
   if (this->prop_start) {
@@ -349,6 +371,20 @@ void gaggled::Program::died(Gaggled* g, std::string down_type, int rcode) {
   for (auto i = this->dependencies->begin(); i != this->dependencies->end(); i++)
     if ((*i)->is_on(this))
       (*i)->prop_down(g);
+}
+
+uint64_t gaggled::Program::uptime() {
+  if (not this->running)
+    return 0;
+
+  timeval uptime;
+  if (gettimeofday(&uptime, NULL) != 0)
+    std::cout << "error: failed to gettimeofday(), timing behaviour warning." << std::endl;
+
+  uint64_t ms = (uptime.tv_sec - started.tv_sec) * 1000;
+  ms += (uptime.tv_usec - started.tv_usec) / 1000;
+
+  return ms;
 }
 
 bool gaggled::Program::is_up(int ms) {
@@ -398,17 +434,21 @@ unsigned long long gaggled::Program::get_token() {
 }
 
 void gaggled::Program::op_start(gaggled::Gaggled* g) {
-    if (is_enabled()) {
-      operator_shutdown = false;
-      new StartEvent(g, this);
-    }
+  operator_shutdown = false;
+  this->statechanges++;
+  g->broadcast_state(this);
+  new StartEvent(g, this);
+}
+
+void gaggled::Program::op_kill(gaggled::Gaggled* g) {
+  new KillEvent(g, this, SIGTERM, false, true);
 }
 
 void gaggled::Program::op_shutdown(gaggled::Gaggled* g) {
-    if (is_enabled()) {
-      operator_shutdown = true;
-      new KillEvent(g, this, SIGTERM, false, true);
-    }
+  operator_shutdown = true;
+  this->statechanges++;
+  g->broadcast_state(this);
+  new KillEvent(g, this, SIGTERM, false, true);
 }
 
 bool gaggled::Program::is_operator_shutdown() {

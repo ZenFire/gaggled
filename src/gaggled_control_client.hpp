@@ -15,10 +15,11 @@ namespace gaggled_control_client {
     const uint8_t ST_AFFIRM = 0;
     const uint8_t ST_BADMSG = 1;
     const uint8_t ST_FAILED = 2;
-    const uint32_t WIRE_VERSION = 5235;
-    const uint32_t FNUM_GETSTATE = 1;
-    const uint32_t FNUM_START = 2;
-    const uint32_t FNUM_STOP = 3;
+    const uint32_t WIRE_VERSION = 5236;
+    const uint32_t FNUM_GETSTATES = 1;
+    const uint32_t FNUM_KILL = 2;
+    const uint32_t FNUM_START = 3;
+    const uint32_t FNUM_STOP = 4;
 
     class ServerBadMessage : public std::exception {
     public:
@@ -44,17 +45,38 @@ namespace gaggled_control_client {
      // members
     };
 
-    class ProgramStates {
+    class ProgramState {
     public:
      // functions
      // members
-      std::vector<std::string> down;
-      std::vector<std::string> up;
+      uint8_t dependencies_satisfied;
+      std::string down_type;
+      uint8_t during_shutdown;
+      uint8_t is_operator_shutdown;
+      int64_t pid;
+      std::string program;
+      uint64_t state_sequence;
+      uint8_t up;
+      uint64_t uptime_ms;
     };
 
     class gaggled_control : public rpgbase::RPGService {
     public:
      // functions
+      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        uint8_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 1))) {
+          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 1);
+      }
       uint32_t decode_uint32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         uint32_t ret;
         if ((buf_size >= ((*(buf_offset)) + 4))) {
@@ -72,19 +94,22 @@ namespace gaggled_control_client {
         outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 4);
       }
-      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        uint8_t ret;
-        if ((buf_size >= ((*(buf_offset)) + 1))) {
-          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
-          (*(buf_offset)) = ((*(buf_offset)) + 1);
+      int32_t decode_int32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        int32_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          ret = ((((int32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((int32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((int32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((int32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
         } else {
           throw BadMessage();
         }
         return ret;
       }
-      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 1);
+      void encode_int32_t (uint8_t* outbuf, uint32_t* buf_offset, int32_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
       }
       std::string decode_progname (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         char vchar_buf[256];
@@ -118,10 +143,10 @@ namespace gaggled_control_client {
         memcpy(((*(buf_offset)) + outbuf), ((&(obj)))->c_str(), lencache);
         (*(buf_offset)) = ((*(buf_offset)) + lencache);
       }
-      ProgramStates decode_ProgramStates (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+      std::vector<ProgramState> decode_ProgramStateList (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         char vchar_buf[256];
         uint32_t vchar_size;
-        ProgramStates ret;
+        std::vector<ProgramState> ret;
         uint32_t blsize;
         if ((buf_size >= ((*(buf_offset)) + 4))) {
           blsize = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
@@ -129,11 +154,48 @@ namespace gaggled_control_client {
         } else {
           throw BadMessage();
         }
-        if ((blsize > 64)) {
+        if ((blsize > 1024)) {
           throw BadMessage();
         }
         for (uint32_t blidx=0; (blidx < blsize); blidx = (blidx + 1)) {
-          std::string rd;
+          ProgramState rd;
+          if ((buf_size >= ((*(buf_offset)) + 1))) {
+            rd.dependencies_satisfied = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+            (*(buf_offset)) = ((*(buf_offset)) + 1);
+          } else {
+            throw BadMessage();
+          }
+          if ((buf_size >= ((*(buf_offset)) + 4))) {
+            vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+            (*(buf_offset)) = ((*(buf_offset)) + 4);
+          } else {
+            throw BadMessage();
+          }
+          if ((vchar_size > 4)) {
+            throw BadMessage();
+          }
+          memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
+          vchar_buf[vchar_size] = 0;
+          rd.down_type = std::string(vchar_buf);
+          (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
+          if ((buf_size >= ((*(buf_offset)) + 1))) {
+            rd.during_shutdown = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+            (*(buf_offset)) = ((*(buf_offset)) + 1);
+          } else {
+            throw BadMessage();
+          }
+          if ((buf_size >= ((*(buf_offset)) + 1))) {
+            rd.is_operator_shutdown = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+            (*(buf_offset)) = ((*(buf_offset)) + 1);
+          } else {
+            throw BadMessage();
+          }
+          if ((buf_size >= ((*(buf_offset)) + 8))) {
+            rd.pid = ((((int64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((int64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((int64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((int64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((int64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((int64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((int64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((int64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+            (*(buf_offset)) = ((*(buf_offset)) + 8);
+          } else {
+            throw BadMessage();
+          }
           if ((buf_size >= ((*(buf_offset)) + 4))) {
             vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
             (*(buf_offset)) = ((*(buf_offset)) + 4);
@@ -145,42 +207,33 @@ namespace gaggled_control_client {
           }
           memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
           vchar_buf[vchar_size] = 0;
-          rd = std::string(vchar_buf);
+          rd.program = std::string(vchar_buf);
           (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
-          ((&(ret.down)))->push_back(rd);
-        }
-        uint32_t blsize_1;
-        if ((buf_size >= ((*(buf_offset)) + 4))) {
-          blsize_1 = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
-          (*(buf_offset)) = ((*(buf_offset)) + 4);
-        } else {
-          throw BadMessage();
-        }
-        if ((blsize_1 > 64)) {
-          throw BadMessage();
-        }
-        for (uint32_t blidx_1=0; (blidx_1 < blsize_1); blidx_1 = (blidx_1 + 1)) {
-          std::string rd_1;
-          if ((buf_size >= ((*(buf_offset)) + 4))) {
-            vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
-            (*(buf_offset)) = ((*(buf_offset)) + 4);
+          if ((buf_size >= ((*(buf_offset)) + 8))) {
+            rd.state_sequence = ((((uint64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((uint64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((uint64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((uint64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((uint64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((uint64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((uint64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((uint64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+            (*(buf_offset)) = ((*(buf_offset)) + 8);
           } else {
             throw BadMessage();
           }
-          if ((vchar_size > 255)) {
+          if ((buf_size >= ((*(buf_offset)) + 1))) {
+            rd.up = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+            (*(buf_offset)) = ((*(buf_offset)) + 1);
+          } else {
             throw BadMessage();
           }
-          memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
-          vchar_buf[vchar_size] = 0;
-          rd_1 = std::string(vchar_buf);
-          (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
-          ((&(ret.up)))->push_back(rd_1);
+          if ((buf_size >= ((*(buf_offset)) + 8))) {
+            rd.uptime_ms = ((((uint64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((uint64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((uint64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((uint64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((uint64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((uint64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((uint64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((uint64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+            (*(buf_offset)) = ((*(buf_offset)) + 8);
+          } else {
+            throw BadMessage();
+          }
+          ((&(ret)))->push_back(rd);
         }
         return ret;
       }
-      void encode_ProgramStates (uint8_t* outbuf, uint32_t* buf_offset, ProgramStates& obj) {
-        uint32_t listsize=((&(obj.down)))->size();
-        if ((listsize > 64)) {
+      void encode_ProgramStateList (uint8_t* outbuf, uint32_t* buf_offset, std::vector<ProgramState> obj) {
+        uint32_t listsize=((&(obj)))->size();
+        if ((listsize > 1024)) {
           throw BadMessage();
         }
         outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((listsize >> 24) & 255)));
@@ -189,8 +242,10 @@ namespace gaggled_control_client {
         outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((listsize >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 4);
         for (uint32_t listoffset=0; (listoffset < listsize); listoffset = (listoffset + 1)) {
-          uint32_t lencache=((&(obj.down[listoffset])))->length();
-          if ((lencache > 255)) {
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].dependencies_satisfied >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+          uint32_t lencache=((&(obj[listoffset].down_type)))->length();
+          if ((lencache > 4)) {
             throw BadMessage();
           }
           outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((lencache >> 24) & 255)));
@@ -198,20 +253,22 @@ namespace gaggled_control_client {
           outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache >> 8) & 255)));
           outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache >> 0) & 255)));
           (*(buf_offset)) = ((*(buf_offset)) + 4);
-          memcpy(((*(buf_offset)) + outbuf), ((&(obj.down[listoffset])))->c_str(), lencache);
+          memcpy(((*(buf_offset)) + outbuf), ((&(obj[listoffset].down_type)))->c_str(), lencache);
           (*(buf_offset)) = ((*(buf_offset)) + lencache);
-        }
-        uint32_t listsize_1=((&(obj.up)))->size();
-        if ((listsize_1 > 64)) {
-          throw BadMessage();
-        }
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((listsize_1 >> 24) & 255)));
-        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((listsize_1 >> 16) & 255)));
-        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((listsize_1 >> 8) & 255)));
-        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((listsize_1 >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 4);
-        for (uint32_t listoffset_1=0; (listoffset_1 < listsize_1); listoffset_1 = (listoffset_1 + 1)) {
-          uint32_t lencache_1=((&(obj.up[listoffset_1])))->length();
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].during_shutdown >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].is_operator_shutdown >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].pid >> 56) & 255)));
+          outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj[listoffset].pid >> 48) & 255)));
+          outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj[listoffset].pid >> 40) & 255)));
+          outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj[listoffset].pid >> 32) & 255)));
+          outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj[listoffset].pid >> 24) & 255)));
+          outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj[listoffset].pid >> 16) & 255)));
+          outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj[listoffset].pid >> 8) & 255)));
+          outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj[listoffset].pid >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
+          uint32_t lencache_1=((&(obj[listoffset].program)))->length();
           if ((lencache_1 > 255)) {
             throw BadMessage();
           }
@@ -220,8 +277,28 @@ namespace gaggled_control_client {
           outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache_1 >> 8) & 255)));
           outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache_1 >> 0) & 255)));
           (*(buf_offset)) = ((*(buf_offset)) + 4);
-          memcpy(((*(buf_offset)) + outbuf), ((&(obj.up[listoffset_1])))->c_str(), lencache_1);
+          memcpy(((*(buf_offset)) + outbuf), ((&(obj[listoffset].program)))->c_str(), lencache_1);
           (*(buf_offset)) = ((*(buf_offset)) + lencache_1);
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].state_sequence >> 56) & 255)));
+          outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj[listoffset].state_sequence >> 48) & 255)));
+          outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj[listoffset].state_sequence >> 40) & 255)));
+          outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj[listoffset].state_sequence >> 32) & 255)));
+          outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj[listoffset].state_sequence >> 24) & 255)));
+          outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj[listoffset].state_sequence >> 16) & 255)));
+          outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj[listoffset].state_sequence >> 8) & 255)));
+          outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj[listoffset].state_sequence >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].up >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+          outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 56) & 255)));
+          outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 48) & 255)));
+          outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 40) & 255)));
+          outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 32) & 255)));
+          outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 24) & 255)));
+          outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 16) & 255)));
+          outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 8) & 255)));
+          outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj[listoffset].uptime_ms >> 0) & 255)));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
         }
       }
       ~gaggled_control () {
@@ -247,11 +324,11 @@ namespace gaggled_control_client {
         (sock)->send(out_req);
         (sock)->recv(respmsg_ptr);
       }
-      ProgramStates call_getstate (uint8_t req) {
+      std::vector<ProgramState> call_getstates (int32_t req) {
         msgbuf_s = 0;
         (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
-        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_GETSTATE);
-        (this)->encode_uint8_t(msgbuf, (&(msgbuf_s)), req);
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_GETSTATES);
+        (this)->encode_int32_t(msgbuf, (&(msgbuf_s)), req);
         zmq::message_t response;
         (this)->zmq_reqrep((&(response)));
         uint8_t* inbound_buf=((uint8_t*)(((&(response)))->data()));
@@ -282,7 +359,44 @@ namespace gaggled_control_client {
             }
           }
         }
-        return (this)->decode_ProgramStates(inbound_buf, (&(response_offset)), inbound_bsize);
+        return (this)->decode_ProgramStateList(inbound_buf, (&(response_offset)), inbound_bsize);
+      }
+      uint8_t call_kill (std::string req) {
+        msgbuf_s = 0;
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_KILL);
+        (this)->encode_progname(msgbuf, (&(msgbuf_s)), req);
+        zmq::message_t response;
+        (this)->zmq_reqrep((&(response)));
+        uint8_t* inbound_buf=((uint8_t*)(((&(response)))->data()));
+        uint32_t inbound_bsize=((&(response)))->size();
+        uint8_t remote_rcode;
+        uint32_t response_offset=0;
+        uint32_t wv=(this)->decode_uint32_t(inbound_buf, (&(response_offset)), inbound_bsize);
+        if ((wv != WIRE_VERSION)) {
+          throw BadMessage();
+        }
+        remote_rcode = (this)->decode_uint8_t(inbound_buf, (&(response_offset)), inbound_bsize);
+        if ((remote_rcode != ST_AFFIRM)) {
+          switch (remote_rcode) {
+            case (ST_BADMSG):
+            {
+              throw ServerBadMessage();
+              break;
+            }
+            case (ST_FAILED):
+            {
+              throw ServerException();
+              break;
+            }
+            default:
+            {
+              throw ServerBadMessage();
+              break;
+            }
+          }
+        }
+        return (this)->decode_uint8_t(inbound_buf, (&(response_offset)), inbound_bsize);
       }
       uint8_t call_start (std::string req) {
         msgbuf_s = 0;
@@ -360,7 +474,7 @@ namespace gaggled_control_client {
       }
      // members
       bool ctx_created;
-      uint8_t msgbuf[33168];
+      uint8_t msgbuf[302092];
       uint32_t msgbuf_s;
     };
 }

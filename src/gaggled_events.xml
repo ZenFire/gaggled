@@ -1,15 +1,21 @@
 <protocol module="gaggled_events" type="pubsub" timeout="yes">
-  <wire version="9235" />
+  <wire version="9237" />
 
   <varchar name="progname" max="255" />
   <varchar name="exitconst" max="4" />
 
-	<complex name="StateChange">
-		<field name="program" type="progname" />
-		<field name="up" type="uint8_t" />
+  <complex name="ProgramState">
+    <field name="program" type="progname" />
+    <field name="up" type="uint8_t" />
+    <field name="dependencies_satisfied" type="uint8_t" />
+    <field name="is_operator_shutdown" type="uint8_t" />
     <field name="during_shutdown" type="uint8_t" />
+    <field name="state_sequence" type="uint64_t" />
     <field name="down_type" type="exitconst" />
-	</complex>
+    <field name="pid" type="int64_t" />
+    <field name="uptime_ms" type="uint64_t" />
+  </complex>
 
-	<function name="statechange" in="StateChange" out="void" />
+  <function name="statechange" in="ProgramState" out="void" />
+  <function name="dumped" in="int32_t" out="void" />
 </protocol>

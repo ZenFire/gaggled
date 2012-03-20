@@ -1,7 +1,10 @@
 #include "time.h"
-#include "gaggled_events_client.hpp"
+
 #include <iostream>
 #include <memory>
+#include "gv.hpp"
+
+#include "gaggled_events_client.hpp"
 
 class GaggledWatcher : public gaggled_events_client::gaggled_events<GaggledWatcher> {
   public:
@@ -10,7 +13,7 @@ class GaggledWatcher : public gaggled_events_client::gaggled_events<GaggledWatch
   {
     
   }
-  void handle_statechange(gaggled_events_client::StateChange& obj) {
+  void handle_statechange(gaggled_events_client::ProgramState& obj) {
     if (obj.up == 1) {
       std::cout << "[U] " << obj.program << std::endl;
     } else {
@@ -20,6 +23,7 @@ class GaggledWatcher : public gaggled_events_client::gaggled_events<GaggledWatch
 };
 
 void usage() {
+  std::cout << "gaggled_listener v" << gaggled::version << ", the process state watcher for gaggled." << std::endl << std::endl;
   std::cout << "usage: gaggled_listener (-h|-u <url>)" << std::endl;
   std::cout << "\t-u <url> where url is the ZeroMQ url to connect to." << std::endl;
   std::cout << "\t-h to show help." << std::endl;

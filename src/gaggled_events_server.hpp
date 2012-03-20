@@ -12,8 +12,9 @@
 
 namespace gaggled_events_server {
 
-    const uint32_t WIRE_VERSION = 9235;
-    const uint32_t FNUM_STATECHANGE = 1;
+    const uint32_t WIRE_VERSION = 9237;
+    const uint32_t FNUM_DUMPED = 1;
+    const uint32_t FNUM_STATECHANGE = 2;
 
     class BadMessage : public std::exception {
     public:
@@ -21,19 +22,41 @@ namespace gaggled_events_server {
      // members
     };
 
-    class StateChange {
+    class ProgramState {
     public:
      // functions
      // members
+      uint8_t dependencies_satisfied;
       std::string down_type;
       uint8_t during_shutdown;
+      uint8_t is_operator_shutdown;
+      int64_t pid;
       std::string program;
+      uint64_t state_sequence;
       uint8_t up;
+      uint64_t uptime_ms;
     };
 
     class gaggled_events : public rpgbase::RPGService {
     public:
      // functions
+      int32_t decode_int32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        int32_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          ret = ((((int32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((int32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((int32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((int32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_int32_t (uint8_t* outbuf, uint32_t* buf_offset, int32_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+      }
       uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         uint8_t ret;
         if ((buf_size >= ((*(buf_offset)) + 1))) {
@@ -65,10 +88,16 @@ namespace gaggled_events_server {
         outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 4);
       }
-      StateChange decode_StateChange (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+      ProgramState decode_ProgramState (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         char vchar_buf[256];
         uint32_t vchar_size;
-        StateChange ret;
+        ProgramState ret;
+        if ((buf_size >= ((*(buf_offset)) + 1))) {
+          ret.dependencies_satisfied = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+        } else {
+          throw BadMessage();
+        }
         if ((buf_size >= ((*(buf_offset)) + 4))) {
           vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
           (*(buf_offset)) = ((*(buf_offset)) + 4);
@@ -88,6 +117,18 @@ namespace gaggled_events_server {
         } else {
           throw BadMessage();
         }
+        if ((buf_size >= ((*(buf_offset)) + 1))) {
+          ret.is_operator_shutdown = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+        } else {
+          throw BadMessage();
+        }
+        if ((buf_size >= ((*(buf_offset)) + 8))) {
+          ret.pid = ((((int64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((int64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((int64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((int64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((int64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((int64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((int64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((int64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
+        } else {
+          throw BadMessage();
+        }
         if ((buf_size >= ((*(buf_offset)) + 4))) {
           vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
           (*(buf_offset)) = ((*(buf_offset)) + 4);
@@ -101,15 +142,29 @@ namespace gaggled_events_server {
         vchar_buf[vchar_size] = 0;
         ret.program = std::string(vchar_buf);
         (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
+        if ((buf_size >= ((*(buf_offset)) + 8))) {
+          ret.state_sequence = ((((uint64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((uint64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((uint64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((uint64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((uint64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((uint64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((uint64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((uint64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
+        } else {
+          throw BadMessage();
+        }
         if ((buf_size >= ((*(buf_offset)) + 1))) {
           ret.up = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
           (*(buf_offset)) = ((*(buf_offset)) + 1);
         } else {
           throw BadMessage();
         }
+        if ((buf_size >= ((*(buf_offset)) + 8))) {
+          ret.uptime_ms = ((((uint64_t)(inbuf[((*(buf_offset)) + 0)])) << 56) + ((((uint64_t)(inbuf[((*(buf_offset)) + 1)])) << 48) + ((((uint64_t)(inbuf[((*(buf_offset)) + 2)])) << 40) + ((((uint64_t)(inbuf[((*(buf_offset)) + 3)])) << 32) + ((((uint64_t)(inbuf[((*(buf_offset)) + 4)])) << 24) + ((((uint64_t)(inbuf[((*(buf_offset)) + 5)])) << 16) + ((((uint64_t)(inbuf[((*(buf_offset)) + 6)])) << 8) + (((uint64_t)(inbuf[((*(buf_offset)) + 7)])) << 0))))))));
+          (*(buf_offset)) = ((*(buf_offset)) + 8);
+        } else {
+          throw BadMessage();
+        }
         return ret;
       }
-      void encode_StateChange (uint8_t* outbuf, uint32_t* buf_offset, StateChange& obj) {
+      void encode_ProgramState (uint8_t* outbuf, uint32_t* buf_offset, ProgramState& obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.dependencies_satisfied >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 1);
         uint32_t lencache=((&(obj.down_type)))->length();
         if ((lencache > 4)) {
           throw BadMessage();
@@ -123,6 +178,17 @@ namespace gaggled_events_server {
         (*(buf_offset)) = ((*(buf_offset)) + lencache);
         outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.during_shutdown >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 1);
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.is_operator_shutdown >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 1);
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.pid >> 56) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj.pid >> 48) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj.pid >> 40) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj.pid >> 32) & 255)));
+        outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj.pid >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj.pid >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj.pid >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj.pid >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 8);
         uint32_t lencache_1=((&(obj.program)))->length();
         if ((lencache_1 > 255)) {
           throw BadMessage();
@@ -134,8 +200,26 @@ namespace gaggled_events_server {
         (*(buf_offset)) = ((*(buf_offset)) + 4);
         memcpy(((*(buf_offset)) + outbuf), ((&(obj.program)))->c_str(), lencache_1);
         (*(buf_offset)) = ((*(buf_offset)) + lencache_1);
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.state_sequence >> 56) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj.state_sequence >> 48) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj.state_sequence >> 40) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj.state_sequence >> 32) & 255)));
+        outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj.state_sequence >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj.state_sequence >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj.state_sequence >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj.state_sequence >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 8);
         outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.up >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 1);
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj.uptime_ms >> 56) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj.uptime_ms >> 48) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj.uptime_ms >> 40) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj.uptime_ms >> 32) & 255)));
+        outbuf[((*(buf_offset)) + 4)] = ((uint8_t)(((obj.uptime_ms >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 5)] = ((uint8_t)(((obj.uptime_ms >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 6)] = ((uint8_t)(((obj.uptime_ms >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 7)] = ((uint8_t)(((obj.uptime_ms >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 8);
       }
       ~gaggled_events () {
         delete sock;
@@ -159,16 +243,23 @@ namespace gaggled_events_server {
         memcpy(((&(out_req)))->data(), msgbuf, msgbuf_s);
         (sock)->send(out_req);
       }
-      void pub_statechange (StateChange& req) {
+      void pub_dumped (int32_t req) {
+        msgbuf_s = 0;
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_DUMPED);
+        (this)->encode_int32_t(msgbuf, (&(msgbuf_s)), req);
+        (this)->zmq_sendbuf();
+      }
+      void pub_statechange (ProgramState& req) {
         msgbuf_s = 0;
         (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
         (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_STATECHANGE);
-        (this)->encode_StateChange(msgbuf, (&(msgbuf_s)), req);
+        (this)->encode_ProgramState(msgbuf, (&(msgbuf_s)), req);
         (this)->zmq_sendbuf();
       }
      // members
       bool ctx_created;
-      uint8_t msgbuf[277];
+      uint8_t msgbuf[303];
       uint32_t msgbuf_s;
     };
 }

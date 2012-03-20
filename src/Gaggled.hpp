@@ -29,7 +29,6 @@
 #include "Dependency.hpp"
 #include "Event.hpp"
 
-#include <boost/thread/thread.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -95,7 +94,9 @@ private:
   std::vector<Program*> programs;
   std::vector<Dependency*> dependencies;
   std::queue<Event*>* event_queues[QPRI_END];
-  void broadcast_state(Program* p, bool up, bool during_shutdown=false, const std::string down_type="UNK");
+  void write_state(gaggled_events_server::ProgramState& sc, Program* p);
+  void write_state(gaggled_control_server::ProgramState& sc, Program* p);
+  void broadcast_state(Program* p);
   void read_env_config(boost::property_tree::ptree& pt, std::map<std::string, std::string>* write_to);
   void parse_config(boost::property_tree::ptree pt);
   void clean_up();
@@ -105,8 +106,9 @@ class GaggledController : public gaggled_control_server::gaggled_control<Gaggled
 public:
   GaggledController(Gaggled* g, const char* url);
   uint8_t handle_start (std::string req);
+  uint8_t handle_kill (std::string req);
   uint8_t handle_stop (std::string req);
-  gaggled_control_server::ProgramStates handle_getstate (uint8_t req);
+  std::vector<gaggled_control_server::ProgramState> handle_getstates (int32_t req);
 private:
   Gaggled* g;
 };

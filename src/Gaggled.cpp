@@ -73,18 +73,47 @@ void gaggled::Gaggled::clean_up() {
   }
 }
 
-void gaggled::Gaggled::broadcast_state(Program* p, bool up, bool during_shutdown, const std::string down_type) {
+// TODO undo duplication here
+void gaggled::Gaggled::write_state(gaggled_events_server::ProgramState& sc, Program* p) {
+  sc.program = p->getName();
+  sc.up = (p->is_running() ? 1 : 0);
+  sc.dependencies_satisfied = (p->dependencies_satisfied() ? 1 : 0);
+  sc.is_operator_shutdown = (p->is_operator_shutdown() ? 1 : 0);
+  sc.state_sequence = p->state_changes() + 1;
+  if (sc.up) {
+    sc.during_shutdown = 0;
+    sc.down_type = "NONE";
+    sc.pid = p->get_pid();
+  } else {
+    sc.during_shutdown = (p->is_controlled_shutdown() ? 1 : 0);
+    sc.down_type = p->getDownType();
+    sc.pid = 0;
+    sc.uptime_ms = 0;
+  }
+}
+void gaggled::Gaggled::write_state(gaggled_control_server::ProgramState& sc, Program* p) {
+  sc.program = p->getName();
+  sc.up = (p->is_running() ? 1 : 0);
+  sc.dependencies_satisfied = (p->dependencies_satisfied() ? 1 : 0);
+  sc.is_operator_shutdown = (p->is_operator_shutdown() ? 1 : 0);
+  sc.state_sequence = p->state_changes() + 1;
+  if (sc.up) {
+    sc.during_shutdown = 0;
+    sc.down_type = "NONE";
+    sc.pid = p->get_pid();
+    sc.uptime_ms = p->uptime();
+  } else {
+    sc.during_shutdown = (p->is_controlled_shutdown() ? 1 : 0);
+    sc.down_type = p->getDownType();
+    sc.pid = 0;
+    sc.uptime_ms = 0;
+  }
+}
+
+void gaggled::Gaggled::broadcast_state(Program* p) {
   if (eventserver != NULL) {
-    gaggled_events_server::StateChange sc;
-    sc.program = p->getName();
-    sc.up = (up ? 1 : 0);
-    if (up) {
-      sc.during_shutdown = 0;
-      sc.down_type = "NONE";
-    } else {
-      sc.during_shutdown = (p->is_controlled_shutdown() ? 1 : 0);
-      sc.down_type = down_type;
-    }
+    gaggled_events_server::ProgramState sc;
+    write_state(sc, p);
     eventserver->pub_statechange(sc);
   }
 }
@@ -162,7 +191,11 @@ void gaggled::Gaggled::parse_config(boost::property_tree::ptree pt) {
 
       std::string argv = iter->second.get<std::string>("argv", "");
       std::vector<std::string>* argv_vec = new std::vector<std::string>();
-      boost::split(*argv_vec, argv, boost::is_any_of(" \t"), boost::token_compress_on);
+
+      if (argv != "")
+        boost::split(*argv_vec, argv, boost::is_any_of(" \t"), boost::token_compress_on);
+
+      std::string wd = iter->second.get<std::string>("wd", "");
 
       bool respawn = iter->second.get<bool>("respawn", true);
       bool enabled = iter->second.get<bool>("enabled", true);
@@ -174,7 +207,7 @@ void gaggled::Gaggled::parse_config(boost::property_tree::ptree pt) {
         read_env_config(*env_o, &own_env);
       }
 
-      Program* p = new Program(name, command, argv_vec, own_env, respawn, enabled);
+      Program* p = new Program(name, command, argv_vec, own_env, wd, respawn, enabled);
       this->programs.push_back(p);
       this->program_map[name] = p;
 
@@ -232,6 +265,16 @@ uint8_t gaggled::GaggledController::handle_start (std::string req) {
     return 1;
   }
 }
+uint8_t gaggled::GaggledController::handle_kill (std::string req) {
+  try {
+    Program* p = g->get_program(req);
+    std::cout << "[ctrl] killing " << req << std::endl;
+    p->op_kill(g);
+    return 0;
+  } catch (BadConfigException& bce) {
+    return 1;
+  }
+}
 uint8_t gaggled::GaggledController::handle_stop (std::string req) {
   try {
     Program* p = g->get_program(req);
@@ -242,16 +285,21 @@ uint8_t gaggled::GaggledController::handle_stop (std::string req) {
     return 1;
   }
 }
-gaggled_control_server::ProgramStates gaggled::GaggledController::handle_getstate (uint8_t req) {
-  std::cout << "[ctrl] getstate" << std::endl;
-  gaggled_control_server::ProgramStates states;
+
+std::vector<gaggled_control_server::ProgramState> gaggled::GaggledController::handle_getstates (int32_t req) {
+  std::cout << "[ctrl] getstates" << std::endl;
+
+  std::vector<gaggled_control_server::ProgramState> states;
+
   for (auto p = g->programs.begin(); p != g->programs.end(); p++) {
-    if ((*p)->is_running()) {
-      states.up.push_back((*p)->getName());
-    } else {
-      states.down.push_back((*p)->getName());
-    }
+    gaggled_control_server::ProgramState ps;
+    g->write_state(ps, *p);
+    states.push_back(ps);
   }
+  
+  if (g->eventserver != NULL)
+    g->eventserver->pub_dumped(req);
+
   return states;
 }
 
@@ -268,7 +316,7 @@ void gaggled::Gaggled::run() {
 
   // kick off start of enabled processes
   for (auto p = this->programs.begin(); p != this->programs.end(); p++)
-    if ((*p)->is_enabled())
+    if (!(*p)->is_operator_shutdown())
       new gaggled::StartEvent(this, *p);
 
   bool known_stopped = false;

@@ -1,0 +1,11 @@
+namespace gaggled {
+
+const std::string version("@PACKAGE_VERSION@");
+
+const uint8_t version_major = @gaggled_VERSION_MAJOR@;
+const uint8_t version_minor = @gaggled_VERSION_MINOR@;
+const uint8_t version_patch = @gaggled_VERSION_PATCH@;
+const uint8_t version_build = @gaggled_VERSION_BUILD@;
+const uint32_t version_number = @gaggled_VERSION_NUMBER@;
+
+}

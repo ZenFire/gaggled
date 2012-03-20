@@ -30,6 +30,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
+#include "gv.hpp"
 #include "Program.hpp"
 #include "Gaggled.hpp"
 
@@ -46,6 +47,7 @@ void die_callback(int a) {
 }
 
 void usage() {
+  std::cout << "gaggled v" << gaggled::version << ", process manager for running a gaggle of daemons." << std::endl << std::endl;
   std::cout << "usage: gaggled (-h|-c <file> [-t])" << std::endl;
   std::cout << "\t-c <file> where file is the configuration file." << std::endl;
   std::cout << "\t-h to show help." << std::endl;
@@ -115,8 +117,8 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-	signal(SIGTERM, die_callback);
-	signal(SIGINT, die_callback);
+  signal(SIGTERM, die_callback);
+  signal(SIGINT, die_callback);
   g->run();
   delete g;
 

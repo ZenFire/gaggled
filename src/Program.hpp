@@ -26,6 +26,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <sys/time.h>
 #include "Gaggled.hpp"
 
 namespace gaggled {
@@ -33,23 +34,27 @@ class Dependency;
 class Program
 {
 public:
-  Program(std::string name, std::string command, std::vector<std::string>* argv, std::map<std::string, std::string> own_env, bool respawn, bool enabled);
+  Program(std::string name, std::string command, std::vector<std::string>* argv, std::map<std::string, std::string> own_env, std::string wd, bool respawn, bool enabled);
   ~Program();
   void overlay_environment(std::map<std::string, std::string> global_environment);
   std::string to_string();
   std::string getName();
   bool search(std::vector<std::string>* path);
   void add_dependency(Dependency* d);
-  bool is_enabled();
   bool is_running();
+  pid_t get_pid();
+  std::string getDownType();
+  uint64_t state_changes();
   std::string get_command();
   bool dependencies_satisfied();
   void start(Gaggled* g);
   void kill_program(Gaggled* g, int signal, bool prop_start, unsigned long long token);
   void died(Gaggled* g, std::string down_type, int rcode);
+  uint64_t uptime();
   bool is_up(int ms);
   unsigned long long get_token();
   void op_start(Gaggled* g);
+  void op_kill(Gaggled* g);
   void op_shutdown(Gaggled* g);
   bool is_operator_shutdown();
   bool is_controlled_shutdown();
@@ -62,20 +67,23 @@ private:
   std::string command;
   std::vector<std::string> commands;
   std::vector<std::string>* argv;
+  std::string wd;
   std::map<std::string, std::string> own_env;
   std::vector<Dependency*>* dependencies;
   bool respawn;
-  bool enabled;
   bool operator_shutdown;
+  // FIXME is this ever true? What's the use of it?
   bool controlled_shutdown;
   char **exec_argv;
   char **exec_env;
   // changable state
   bool running;
+  std::string down_type;
   bool prop_start;
   pid_t pid;
   timeval started;
   unsigned long long token;
+  uint64_t statechanges;
 };
 std::ostream &operator<< (std::ostream &stream, Program& p);
 }
