@@ -40,8 +40,8 @@ You may be clever enough to just use **gaggled** right after building, but you'r
 
 * CMake 2.6 or later
 * GCC 4.4 or later
-* Boost 1.44
-* ZeroMQ 2.1 with C++ support. 2.0 does not work with , but will build.
+* Boost 1.42.0 or later
+* ZeroMQ 2.1 with C++ support. 2.0 does not work, but will build.
 
 # Concepts / Configuration
 
