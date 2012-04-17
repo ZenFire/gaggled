@@ -91,7 +91,7 @@ During **gaggled** shutdown and in other scenarios, sometimes a program must be 
 
 # Listener, Controller, and SMTP Gate
 
-There are two utility programs included with **gaggled**.
+There are some utility programs included with **gaggled**.
 
 ## Listener
 
