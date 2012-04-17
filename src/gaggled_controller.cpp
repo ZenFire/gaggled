@@ -9,9 +9,9 @@ void usage() {
   std::cout << "gaggled_controller v" << gaggled::version << ", tool for controlling a running gaggled instance." << std::endl << std::endl;
   std::cout << "usage: gaggled_controller (-h|-u <url> (-s <program>|-k <program>|-d))" << std::endl;
   std::cout << "\t-u <url> where url is the ZeroMQ url to connect to." << std::endl;
-  std::cout << "\t-s <program> take program out of admin down state and direct gaggled to attempt to start it." << std::endl;
-  std::cout << "\t-r <program> direct gaggled to shut it down the program; if configured to restart, it will restart." << std::endl;
-  std::cout << "\t-k <program> put program in admin down state and direct gaggled to shut it down." << std::endl;
+  std::cout << "\t-s <program> direct gaggled to take program out of admin down state; if its dependencies are met, it will start." << std::endl;
+  std::cout << "\t-r <program> direct gaggled to shut down the program; if configured to restart and its dependencies are met, it will restart." << std::endl;
+  std::cout << "\t-k <program> put program in admin down state and direct gaggled to shut it down. A program that is set to 'enabled false' in config is in admin down (also known as operator down) state at startup." << std::endl;
   std::cout << "\t-d to dump a summary of the programs running and their states." << std::endl;
   std::cout << "\t-h to show help." << std::endl;
 }
@@ -163,9 +163,9 @@ int main(int argc, char** argv) {
       std::string pid_s = boost::lexical_cast<std::string>(p->pid);
 
       std::cout << "] " << p->program << std::string(maxname + 1 - p->program.length(), ' ');
-      std::cout << p->pid << std::string(maxpid + 1 - pid_s.length(), ' ');
-      
       if (p->up) {
+        std::cout << p->pid << std::string(maxpid + 1 - pid_s.length(), ' ');
+      
         std::string ms = boost::lexical_cast<std::string>(p->uptime_ms % 1000);
         
         std::cout << "up " << (p->uptime_ms / 1000) << "." << std::string(3 - ms.length(), '0') << ms << "s";

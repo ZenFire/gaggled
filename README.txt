@@ -105,11 +105,11 @@ The program **gaggled_controller** will connect to a gaggled instance that is co
 
 The program **gaggled_smtpgate** will connect to a gaggled instance that is configured with the `eventurl` and `controlurl` options and forward incoming program state changes messages via status emails to SMTP.  Other options are also required.  Use the -h option for help and required options.
 
-The SMTP gateway must be restart for each gaggled restart, as sequence numbers start over and the set of programs can change, resulting in undefined behaviour.  Shut down the SMTP gateway before shutting down gaggled, and start gaggled before starting the SMTP gateway.  The easiest way to do this is run the SMTP gateway from within gaggled.
+The SMTP gateway must be restarted for each gaggled restart, as sequence numbers start over and the set of programs can change, resulting in undefined behaviour.  Shut down the SMTP gateway before shutting down gaggled, and start gaggled before starting the SMTP gateway.  The easiest and most reliable way to do this is run the SMTP gateway from within the gaggled it is connecting to.
 
 # Caveats
 
-* There is, at present, **no security** on the control or event channels. If you use `eventurl` or `controlurl`, transport restrictions such as firewalls and binding to localhost are the the only restriction on status information and up/down commands being interchanged.
+* There is, at present, **no security** on the control or event channels. If you use `eventurl` or `controlurl`, transport restrictions such as firewalls, permissions on unix sockets, binding to localhost are the the only restriction on status information and up/down commands being interchanged.
 * You must have a reliable system clock. startup sequences and SMTP notifications may not operate as expected if the system clock jumps forward or backward.  At the moment, timezone change/DST is untested.  Use UTC.  This is subject to change.
 * using a large `startwait` or `tick` (compared to `delay` etc) can result in confusing behaviour (things taking longer to start or be recognized as stopped than expected)
 * any program that uses the exit codes `EX_NOPERM`, `EX_DATAERR`, `EX_NOINPUT`, or `EX_UNAVAILABLE` (defined in sysexits.h for your system) may result in gaggled logging a specific type of execution failure that may not be accurate.
