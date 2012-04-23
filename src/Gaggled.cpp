@@ -287,7 +287,7 @@ uint8_t gaggled::GaggledController::handle_stop (std::string req) {
 }
 
 std::vector<gaggled_control_server::ProgramState> gaggled::GaggledController::handle_getstates (int32_t req) {
-  std::cout << "[ctrl] getstates" << std::endl;
+  // too noisy to be there in production builds std::cout << "[ctrl] getstates" << std::endl;
 
   std::vector<gaggled_control_server::ProgramState> states;
 
