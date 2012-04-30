@@ -291,7 +291,7 @@ void gaggled::util::SMTP::send(std::string from, std::string to, std::string sub
     line = read_line(sock, deadline); rc = rcode(line);
     no_hangup(rc); in_range(rc, 200, 300, line);
 
-    send_socket(sock, "VRFY " + from + "\r\n", deadline);
+    send_socket(sock, "VRFY " + to + "\r\n", deadline);
     line = read_line(sock, deadline); rc = rcode(line);
     no_hangup(rc);
     if (rc != 551)
