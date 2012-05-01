@@ -149,7 +149,7 @@ The program **gaggled_controller** will connect to a gaggled instance that is co
 <A name="toc2-120" title="SMTP Gate" />
 ## SMTP Gate
 
-The program **gaggled_smtpgate** will connect to a gaggled instance that is configured with the `eventurl` and `controlurl` options and forward incoming program state changes messages via status emails to SMTP.  Other options are also required.  Use the -h option for help and required options.
+The program **gaggled_smtpgate** will connect to a gaggled instance that is configured with the `eventurl` and `controlurl` options and forward incoming program state changes messages via status emails to SMTP.  Other options are also required.  Use the `-h` option for help and required options.
 
 The SMTP gateway must be restarted for each gaggled restart, as sequence numbers start over and the set of programs can change, resulting in undefined behaviour.  Shut down the SMTP gateway before shutting down gaggled, and start gaggled before starting the SMTP gateway.  The easiest and most reliable way to do this is run the SMTP gateway from within the gaggled it is connecting to.
 
