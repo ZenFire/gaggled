@@ -95,19 +95,13 @@ int main(int argc, char** argv) {
     return 2;
   }
   
-  boost::property_tree::ptree config;
-
   try {
-    boost::property_tree::read_info(conf_file, config);
-  } catch (boost::property_tree::info_parser::info_parser_error& pe) {
-    std::cout << "configtest: parse error at " << pe.filename() << ":" << pe.line() << ": " << pe.message() << std::endl;
-    return 1;
-  }
-
-  try {
-    g = new Gaggled(config);
+    g = new Gaggled(conf_file);
   } catch (BadConfigException& bce) {
     std::cout << "configtest: failed, " << bce.reason << std::endl;
+    return 1;
+  } catch (boost::property_tree::info_parser::info_parser_error& pe) {
+    std::cout << "configtest: parse error at " << pe.filename() << ":" << pe.line() << ": " << pe.message() << std::endl;
     return 1;
   }
 

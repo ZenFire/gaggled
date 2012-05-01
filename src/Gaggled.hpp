@@ -71,7 +71,7 @@ class Gaggled
   friend class KillEvent;
   friend class GaggledController;
 public:
-  Gaggled(boost::property_tree::ptree pt);
+  Gaggled(char* conf_file);
   ~Gaggled();
   void run();
   void check_deaths();
@@ -98,7 +98,7 @@ private:
   void write_state(gaggled_control_server::ProgramState& sc, Program* p);
   void broadcast_state(Program* p);
   void read_env_config(boost::property_tree::ptree& pt, std::map<std::string, std::string>* write_to);
-  void parse_config(boost::property_tree::ptree pt);
+  void parse_config(char* conf_file);
   void clean_up();
 };
 

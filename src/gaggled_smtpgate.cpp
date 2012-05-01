@@ -629,22 +629,16 @@ void usage() {
   std::cout << "  smtpgate {" << std::endl;
   std::cout << "    period - must wait this many milliseconds before deciding a new state since the last one (default 10000)" << std::endl;
   std::cout << "    batch - if set, activate batch mode and must wait this many milliseconds before sending out new changes since the last. Batch mode includes an [ALL OK] flag in the subject when recovery is complete." << std::endl;
+  std::cout << "    auto - boolean. Does not affect gaggled_smtpgate directly; if true, gaggled will start an smtpgate called smtpgate without any config stanza for the smtpgate subprocess." << std::endl;
   std::cout << "  }" << std::endl;
   std::cout << "}" << std::endl;
 }
 
-int main(int argc, char** argv) {
-  std::string controlurl;
-  std::string eventurl;
-  int period;
-  int batch;
-  std::string prefix;
-  std::string mx;
-  std::string helo;
-  std::string from;
-  std::string to;
+#define SMTP_CONFIGTEST_FAIL(msg) std::cout << msg << std::endl << std::flush; \
+        return 1;
 
-  const char* config_file = NULL;
+int main(int argc, char** argv) {
+  const char* conf_file = NULL;
   bool verbose = false;
   bool help = false;
 
@@ -658,7 +652,7 @@ int main(int argc, char** argv) {
         verbose = true;
         break;
       case 'c':
-        config_file = optarg;
+        conf_file = optarg;
         break;
       case '?':
         usage();
@@ -674,52 +668,12 @@ int main(int argc, char** argv) {
     return 0;
   }
   
-  if (config_file == NULL) {
+  if (conf_file == NULL) {
     usage();
     return 2;
   }
 
-  boost::property_tree::ptree config;
-  std::string which_setting = "";
-
-  try {
-    boost::property_tree::read_info(config_file, config);
-  } catch (boost::property_tree::info_parser::info_parser_error& pe) {
-    std::cout << "gaggled_smtpgate: configtest: parse error at " << pe.filename() << ":" << pe.line() << ": " << pe.message() << std::endl;
-    return 1;
-  }
-
-  try {
-    which_setting = "gaggled.controlurl";
-    controlurl = config.get<std::string>(which_setting);
-    which_setting = "gaggled.eventurl";
-    eventurl = config.get<std::string>(which_setting);
-
-    which_setting = "gaggled.smtpgate.mx";
-    mx = config.get<std::string>(which_setting);
-    which_setting = "gaggled.smtpgate.helo";
-    helo = config.get<std::string>(which_setting);
-    which_setting = "gaggled.smtpgate.from";
-    from = config.get<std::string>(which_setting);
-    which_setting = "gaggled.smtpgate.to";
-    to = config.get<std::string>(which_setting);
-
-    period = config.get<int>("gaggled.smtpgate.period", 10000);
-    if (period < 1) {
-      std::cout << "gaggled_smtpgate: configtest: gaggled.smtpgate.period must be a positive integer" << std::endl << std::flush;
-      return 1;
-    }
-    batch = config.get<int>("gaggled.smtpgate.batch", 0);
-    if (batch < 0) {
-      std::cout << "gaggled_smtpgate: configtest: gaggled.smtpgate.batch must be a non-negative integer" << std::endl << std::flush;
-      return 1;
-    }
-
-    prefix = config.get<std::string>("gaggled.smtpgate.spfix", "");
-  } catch (boost::property_tree::ptree_bad_path& pbp) {
-    std::cout << "gaggled_smtpgate: configtest: required setting " << which_setting << " is not set in " << config_file << "." << std::endl << std::flush;
-    return 1;
-  }
+  #include "gaggled_smptgate_config.hpp"
 
   StateNotifier gaggled_state(period, batch, prefix, mx, helo, from, to, verbose);
   

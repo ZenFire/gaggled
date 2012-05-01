@@ -27,12 +27,13 @@
 #include <queue>
 #include <boost/optional.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 #include "Event.hpp"
 #include "Gaggled.hpp"
 #include "gaggled_control_server.hpp"
 #include "gaggled_events_server.hpp"
 
-gaggled::Gaggled::Gaggled(boost::property_tree::ptree pt) :
+gaggled::Gaggled::Gaggled(char* conf_file) :
   stopped(false),
   tick(10),
   startwait(100),
@@ -41,7 +42,7 @@ gaggled::Gaggled::Gaggled(boost::property_tree::ptree pt) :
   for (int i = 0; i != QPRI_END; i++)
     this->event_queues[i] = new std::queue<Event*>();
   try {
-    this->parse_config(pt);
+    this->parse_config(conf_file);
   } catch (...) {
     clean_up();
     throw;
@@ -126,7 +127,12 @@ void gaggled::Gaggled::read_env_config(boost::property_tree::ptree& pt, std::map
     }
 }
 
-void gaggled::Gaggled::parse_config(boost::property_tree::ptree pt) {
+#define SMTP_CONFIGTEST_FAIL(msg) throw gaggled::BadConfigException(msg);
+
+void gaggled::Gaggled::parse_config(char* conf_file) {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(conf_file, pt);
+
   // get $PATH
   this->path = getenv("PATH");
   if (this->path != NULL)
@@ -175,9 +181,18 @@ void gaggled::Gaggled::parse_config(boost::property_tree::ptree pt) {
         env_map["PATH"] = std::string(path);
       }
 
-      boost::optional<boost::property_tree::ptree&> global_env = iter->second.get_child_optional("env");
-      if (global_env) {
-        read_env_config(*global_env, &env_map);
+      if (iter->second.get<bool>("smtpgate.auto", false)) {
+        {
+          #include "gaggled_smptgate_config.hpp"
+        }
+
+        std::vector<std::string>* smtpgate_args = new std::vector<std::string>();
+        smtpgate_args->push_back("-c");
+        smtpgate_args->push_back(std::string(conf_file));
+        std::map<std::string, std::string> own_env;
+        Program* smtpgate = new Program("smtpgate", "gaggled_smtpgate", smtpgate_args, own_env, "", true, true);
+        this->programs.push_back(smtpgate);
+        this->program_map["smtpgate"] = smtpgate;
       }
     } else {
       // first check for dupe
