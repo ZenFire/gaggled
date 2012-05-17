@@ -51,7 +51,7 @@ public:
     SMTPProtocolException(std::string msg);
     };
 
-  class SMTPTooSlowException : virtual SMTPException {};
+  class SMTPTooSlowException : public SMTPException {};
 
   class DeadlineException : virtual SMTPException {};
 
@@ -60,13 +60,14 @@ class SMTP
 public:
   SMTP(std::string mx, std::string helo);
   void send(std::string from, std::string to, std::string subject, std::string body);
-
+  long ms_deadline();
 private:
   void send_socket(int sock, std::string s, boost::system_time deadline);
   std::string read_line(int sock, boost::system_time deadline);
   int rcode(std::string line);
   void no_hangup(int v);
   void in_range(int v, int begin, int end, std::string line);
+  void deadline_wr_timeval(boost::system_time &deadline, struct timeval &tv);
 
   std::string mx;
   std::string helo;

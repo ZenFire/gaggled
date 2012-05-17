@@ -1,5 +1,6 @@
 #include "gaggled_control_client.hpp"
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <memory>
 #include <boost/lexical_cast.hpp>
@@ -13,6 +14,7 @@ void usage() {
   std::cout << "\t-r <program> direct gaggled to shut down the program; if configured to restart and its dependencies are met, it will restart." << std::endl;
   std::cout << "\t-k <program> put program in admin down state and direct gaggled to shut it down. A program that is set to 'enabled false' in config is in admin down (also known as operator down) state at startup." << std::endl;
   std::cout << "\t-d to dump a summary of the programs running and their states." << std::endl;
+  std::cout << "\t-p in conjunction with -d, print durations of uptime in a more readable format (D days, H:M:S)." << std::endl;
   std::cout << "\t-h to show help." << std::endl;
 }
 
@@ -24,13 +26,14 @@ const int ACT_DUMP = 4;
 
 int main(int argc, char** argv) {
   bool help = false;
+  bool printnice = false;
 
   const char* url = NULL;
   const char* program = NULL;
   int action = ACT_NONE;
 
   int gs;
-  while ((gs = getopt(argc, argv, "hds:k:r:u:")) != -1) {
+  while ((gs = getopt(argc, argv, "hpds:k:r:u:")) != -1) {
     switch(gs) {
       case 'h':
         help = true;
@@ -45,6 +48,9 @@ int main(int argc, char** argv) {
           return 1;
           }
         action = ACT_DUMP;
+        break;
+      case 'p':
+        printnice = true;
         break;
       case 's':
         if (action != ACT_NONE)
@@ -98,6 +104,11 @@ int main(int argc, char** argv) {
   }
 
   if (action == ACT_NONE) {
+    usage();
+    return 2;
+  }
+
+  if ((action != ACT_DUMP) && printnice) {
     usage();
     return 2;
   }
@@ -165,10 +176,48 @@ int main(int argc, char** argv) {
       std::cout << "] " << p->program << std::string(maxname + 1 - p->program.length(), ' ');
       if (p->up) {
         std::cout << p->pid << std::string(maxpid + 1 - pid_s.length(), ' ');
-      
-        std::string ms = boost::lexical_cast<std::string>(p->uptime_ms % 1000);
-        
-        std::cout << "up " << (p->uptime_ms / 1000) << "." << std::string(3 - ms.length(), '0') << ms << "s";
+        std::cout << "up ";
+
+        unsigned long long uptime_s = p->uptime_ms / 1000;
+        if (printnice) {
+          unsigned long long uptime_d, uptime_h, uptime_m;
+
+          uptime_m = uptime_s / 60;
+          uptime_s -= uptime_m * 60;
+
+          uptime_h = uptime_m / 60;
+          uptime_m -= uptime_h * 60;
+
+          uptime_d = uptime_h / 24;
+          uptime_h -= uptime_d * 24;
+
+          // days
+          std::cout << std::setw(6);
+          std::cout << std::setfill(' ');
+          std::cout << uptime_d << " days, ";
+
+          // HMS
+          std::cout << std::setw(2);
+          std::cout << std::setfill('0');
+          std::cout << uptime_h << ":";
+
+          std::cout << std::setw(2);
+          std::cout << std::setfill('0');
+          std::cout << uptime_m << ":";
+
+          std::cout << std::setw(2);
+          std::cout << std::setfill('0');
+        }
+        std::cout << uptime_s;
+
+        // ms
+        std::cout << ".";
+        std::cout << std::setw(3);
+        std::cout << std::setfill('0');    
+        std::cout << (p->uptime_ms % 1000);
+
+        if (!printnice)
+          std::cout << "s";
       }
 
       std::cout << std::endl;

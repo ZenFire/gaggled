@@ -335,13 +335,13 @@ void gaggled::Gaggled::run() {
       new gaggled::StartEvent(this, *p);
 
   bool known_stopped = false;
-  std::cout << "running. tick=" << this->tick << ", PATH=" << this->path << std::endl;
+  std::cout << "[gaggled] running. tick=" << this->tick << ", PATH=" << this->path << std::endl << std::flush;
   while ((not this->stopped) or (this->pid_map.begin() != this->pid_map.end())) {
     // check if this is the first event loop run that is in the shutdown mode
     // we have to kick off the creation of the kill events, as we couldn't do that in the signal handler
     // that called stop() - this could lock.
     if (known_stopped != this->stopped) {
-      std::cout << "caught signal, shutting down." << std::endl;
+      std::cout << "[gaggled] caught signal, shutting down." << std::endl << std::flush;
       for (auto p = this->programs.begin(); p != this->programs.end(); p++)
         new KillEvent(this, *p, SIGTERM, false, true);
     }
@@ -407,7 +407,7 @@ void gaggled::Gaggled::run() {
           controlserver->run_once(0);
         }
       } catch (gaggled_control_server::BadMessage& gcs_bm) {
-        std::cout << "got an bad incoming message on control channel, discarding." << std::endl;
+        std::cout << "[gaggled] got an bad incoming message on control channel, discarding." << std::endl << std::flush;
       }
     }
   }
@@ -447,7 +447,7 @@ void gaggled::Gaggled::check_deaths() {
         down_type = "KILL";
       }
 
-      std::cout << "child pid=" << siginfo.si_pid << " died. exited:" << exited << " status:" << rcode << std::endl;
+      std::cout << "[gaggled] child pid=" << siginfo.si_pid << " died. exited:" << exited << " status:" << rcode << std::endl;
       new gaggled::DiedEvent(this, siginfo.si_pid, down_type, rcode);
     }
   }

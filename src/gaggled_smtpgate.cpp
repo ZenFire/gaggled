@@ -392,15 +392,19 @@ const static uint8_t CHG_NEUT = 3;
       }
     }
 
-    if (to != ProgramStateTracker::STATE_UP) {
-      if (last_known_pid != 0) {
-        if (multiline)
-          summary += "\r\n  ";
-        else
-          summary += ", ";
 
-        summary += "last known pid: " + boost::lexical_cast<std::string>(last_known_pid); 
-      }
+    if (last_known_pid != 0) {
+      if (multiline)
+        summary += "\r\n  ";
+      else
+        summary += ", ";
+      
+      if (to != ProgramStateTracker::STATE_UP)
+        summary += "last known pid";
+      else
+        summary += "current pid";
+      
+      summary += ": " + boost::lexical_cast<std::string>(last_known_pid); 
     }
 
 
@@ -460,6 +464,8 @@ public:
       std::cout << "gaggled_smtpgate: [smtp] connection failure" << std::endl;
     } catch (gaggled::util::SMTPBadMailboxOrDomainException& se) {
       std::cout << "gaggled_smtpgate: [smtp] bad mailbox or domain. " << se.what() << std::endl;
+    } catch (gaggled::util::SMTPTooSlowException& se) {
+      std::cout << "gaggled_smtpgate: [smtp] server too slow, deadline was " << agent.ms_deadline() << "ms. " << se.what() << std::endl;
     } catch (gaggled::util::SMTPNoRelayException& se) {
       std::cout << "gaggled_smtpgate: [smtp] smtp relaying refused. " << se.what() << std::endl;
     } catch (gaggled::util::SMTPRejectedException& se) {

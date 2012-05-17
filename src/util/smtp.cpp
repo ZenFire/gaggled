@@ -37,7 +37,7 @@ gaggled::util::SMTP::SMTP(std::string mx, std::string helo)
   :
   mx(mx),
   helo(helo),
-  total_transaction_max(boost::posix_time::milliseconds(20000))
+  total_transaction_max(boost::posix_time::milliseconds(30000))
   {
   }
 
@@ -53,6 +53,22 @@ private:
   int _fd;
   };
 
+void gaggled::util::SMTP::deadline_wr_timeval(boost::system_time &deadline, struct timeval &tv)
+  {
+  boost::system_time now = boost::get_system_time();
+  if (deadline > now)
+    {
+    boost::posix_time::time_duration rem = deadline - now;
+    tv.tv_sec = rem.total_seconds();
+    tv.tv_usec = rem.total_microseconds();
+    }
+  else
+    {
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    }
+  }
+
 void gaggled::util::SMTP::send_socket(int sock, std::string s, boost::system_time deadline)
   {
   int len = s.length();
@@ -64,8 +80,7 @@ void gaggled::util::SMTP::send_socket(int sock, std::string s, boost::system_tim
 
   while (offset < len)
     {
-	  tv.tv_sec = 0;
-  	tv.tv_usec = 500000;
+    deadline_wr_timeval(deadline, tv);
 
 	  FD_ZERO(&writefd);
   	FD_SET(sock, &writefd);
@@ -97,6 +112,11 @@ void gaggled::util::SMTP::send_socket(int sock, std::string s, boost::system_tim
   //std::cout << "sent \"" << s << "\"" << std::endl;
   }
 
+long gaggled::util::SMTP::ms_deadline()
+  {
+  return total_transaction_max.total_milliseconds();
+  }
+
 std::string gaggled::util::SMTP::read_line(int sock, boost::system_time deadline)
   {
   int bytes = 65536;
@@ -110,8 +130,7 @@ std::string gaggled::util::SMTP::read_line(int sock, boost::system_time deadline
 
   while (recvd < bytes)
     {
-	  tv.tv_sec = 0;
-  	tv.tv_usec = 500000;
+    deadline_wr_timeval(deadline, tv);
 
 	  FD_ZERO(&readfd);
   	FD_SET(sock, &readfd);
@@ -232,8 +251,7 @@ void gaggled::util::SMTP::send(std::string from, std::string to, std::string sub
 
       while (boost::get_system_time() < deadline)
         {
-        tv.tv_sec = 0;
-        tv.tv_usec = 500000;
+        deadline_wr_timeval(deadline, tv);
 
       	FD_ZERO(&writefd);
       	FD_SET(sock, &writefd);

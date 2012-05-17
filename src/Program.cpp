@@ -198,6 +198,10 @@ bool gaggled::Program::dependencies_satisfied() {
 }
 
 void gaggled::Program::start(Gaggled* g) {
+  if (not g->is_running()) {
+    std::cout << "not starting " << name << ", gaggled is shutting down." << std::endl << std::flush;
+  }
+
   pid_t pid = fork();
   if (pid == 0) {
     // try to behave similarly to glibc execvpe
@@ -295,11 +299,9 @@ void gaggled::Program::kill_program(Gaggled* g, int signal, bool prop_start, uns
   // ok, this program is currently running...
 
   // if a token is supplied, only act if it matches
-  if (token != 0) {
-    if (token != this->token) {
+  if (token != 0)
+    if (token != this->token)
       return;
-    }
-  }
 
   // program is running and are doing a prop kill: of course we set prop_start
   this->prop_start = prop_start;
@@ -324,6 +326,7 @@ void gaggled::Program::kill_program(Gaggled* g, int signal, bool prop_start, uns
     // is considered controlled.  If kill failed to send, then it shouldn't die, so we don't want
     // to mark it as controlled.
     controlled_shutdown = true;
+    std::cout << "[gaggled] " << name << ": killing with signal " << signal << std::endl << std::flush;
   }
  
   return;
@@ -441,14 +444,14 @@ void gaggled::Program::op_start(gaggled::Gaggled* g) {
 }
 
 void gaggled::Program::op_kill(gaggled::Gaggled* g) {
-  new KillEvent(g, this, SIGTERM, false, true);
+  new KillEvent(g, this, SIGTERM, false, false);
 }
 
 void gaggled::Program::op_shutdown(gaggled::Gaggled* g) {
   operator_shutdown = true;
   this->statechanges++;
   g->broadcast_state(this);
-  new KillEvent(g, this, SIGTERM, false, true);
+  new KillEvent(g, this, SIGTERM, false, false);
 }
 
 bool gaggled::Program::is_operator_shutdown() {
