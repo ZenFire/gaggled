@@ -335,7 +335,7 @@ void gaggled::Gaggled::run() {
       new gaggled::StartEvent(this, *p);
 
   bool known_stopped = false;
-  std::cout << "[gaggled] running. tick=" << this->tick << ", PATH=" << this->path << std::endl << std::flush;
+  std::cout << "[gaggled] running. tick=" << this->tick << ", controlurl=" << this->controlurl << ", eventurl=" << this->eventurl << ", PATH=" << this->path << std::endl << std::flush;
   while ((not this->stopped) or (this->pid_map.begin() != this->pid_map.end())) {
     // check if this is the first event loop run that is in the shutdown mode
     // we have to kick off the creation of the kill events, as we couldn't do that in the signal handler

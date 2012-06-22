@@ -15,6 +15,7 @@ void usage() {
   std::cout << "\t-k <program> put program in admin down state and direct gaggled to shut it down. A program that is set to 'enabled false' in config is in admin down (also known as operator down) state at startup." << std::endl;
   std::cout << "\t-d to dump a summary of the programs running and their states." << std::endl;
   std::cout << "\t-p in conjunction with -d, print durations of uptime in a more readable format (D days, H:M:S)." << std::endl;
+  std::cout << "\t-j in conjunction with -d, print output in json instead of visually aligned table." << std::endl;
   std::cout << "\t-h to show help." << std::endl;
 }
 
@@ -27,13 +28,14 @@ const int ACT_DUMP = 4;
 int main(int argc, char** argv) {
   bool help = false;
   bool printnice = false;
+  bool printjson = false;
 
   const char* url = NULL;
   const char* program = NULL;
   int action = ACT_NONE;
 
   int gs;
-  while ((gs = getopt(argc, argv, "hpds:k:r:u:")) != -1) {
+  while ((gs = getopt(argc, argv, "hpjds:k:r:u:")) != -1) {
     switch(gs) {
       case 'h':
         help = true;
@@ -51,6 +53,9 @@ int main(int argc, char** argv) {
         break;
       case 'p':
         printnice = true;
+        break;
+      case 'j':
+        printjson = true;
         break;
       case 's':
         if (action != ACT_NONE)
@@ -112,6 +117,10 @@ int main(int argc, char** argv) {
     usage();
     return 2;
   }
+  if ((action != ACT_DUMP) && printjson) {
+    usage();
+    return 2;
+  }
 
   std::shared_ptr<gaggled_control_client::gaggled_control> c(new gaggled_control_client::gaggled_control(url));
 
@@ -150,7 +159,8 @@ int main(int argc, char** argv) {
         down++;
     }
 
-    std::cout << "up: " << up << " down: " << down << " opdown: " << opdown << std::endl;
+    if (!printjson)
+      std::cout << "up: " << up << " down: " << down << " opdown: " << opdown << std::endl;
 
     size_t maxname = 0;
     size_t maxpid = 0;
@@ -163,20 +173,54 @@ int main(int argc, char** argv) {
         maxpid = np;
     }
 
+    if (printjson)
+      std::cout << "[" << std::endl;
+
     for (auto p = ps.begin(); p != ps.end(); p++) {
-      if (p->is_operator_shutdown == 1 && p->up == 0)
-        std::cout << "[OPDOWN";
-      else if (p->up == 1)
-        std::cout << "[UP    ";
-      else
-        std::cout << "[DOWN  ";
+      if (!printjson) {
+        std::cout << "[";
+      } else {
+        if (p != ps.begin())
+          std::cout << "," << std::endl;
+        std::cout << "  {" << std::endl << "    \"status\" : \"";
+      }
+      if (p->is_operator_shutdown == 1 && p->up == 0) {
+        std::cout << "OPDOWN";
+      } else if (p->up == 1) {
+        std::cout << "UP";
+        if (!printjson)
+          std::cout << "    ";
+      } else {
+        std::cout << "DOWN";
+        if (!printjson)
+          std::cout << "  ";
+      }
 
       std::string pid_s = boost::lexical_cast<std::string>(p->pid);
 
-      std::cout << "] " << p->program << std::string(maxname + 1 - p->program.length(), ' ');
+      if (!printjson)
+        std::cout << "] ";
+      else
+        std::cout << "\"," << std::endl;
+
+      if (printjson)
+        std::cout << "    \"program\" : \"";
+
+      std::cout << p->program;
+      if (!printjson)
+        std::cout << std::string(maxname + 1 - p->program.length(), ' ');
+      
       if (p->up) {
-        std::cout << p->pid << std::string(maxpid + 1 - pid_s.length(), ' ');
-        std::cout << "up ";
+        if (printjson)
+          std::cout << "\"," << std::endl << "    \"pid\" : ";
+        std::cout << p->pid;
+        if (printjson)
+          std::cout << "," << std::endl;
+
+        if (!printjson)
+          std::cout << std::string(maxpid + 1 - pid_s.length(), ' ') << "up ";
+        else
+          std::cout << "    \"uptime\" : \"";
 
         unsigned long long uptime_s = p->uptime_ms / 1000;
         if (printnice) {
@@ -192,8 +236,10 @@ int main(int argc, char** argv) {
           uptime_h -= uptime_d * 24;
 
           // days
-          std::cout << std::setw(6);
-          std::cout << std::setfill(' ');
+          if (!printjson) {
+            std::cout << std::setw(6);
+            std::cout << std::setfill(' ');
+          }
           std::cout << uptime_d << " days, ";
 
           // HMS
@@ -218,10 +264,43 @@ int main(int argc, char** argv) {
 
         if (!printnice)
           std::cout << "s";
+
+        if (printjson)
+          std::cout << "\"" << std::endl;
+      } else {
+        bool dt = p->down_type != "";
+        bool dns = p->dependencies_satisfied == 0;
+
+        if (dns or dt) {
+          if (!printjson)
+            std::cout << "due to ";
+          else
+            std::cout << "\"," << std::endl << "    \"down_reason\" : \"";
+
+          if (dt)
+            std::cout << p->down_type;
+          if (dns) {
+            if (dt)
+              std::cout << ", ";
+
+            std::cout << "dependencies not satisfied";
+          }
+
+          if (printjson)
+            std::cout << "\"" << std::endl;
+        } else if (printjson) {
+          std::cout << "\"" << std::endl;
+        }
       }
 
-      std::cout << std::endl;
+      if (printjson)
+        std::cout << "  }";
+      else
+        std::cout << std::endl;
     }
+
+    if (printjson)
+      std::cout << std::endl << "]" << std::endl;
   }
   
   return 0;

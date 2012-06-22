@@ -302,6 +302,10 @@ typedef std::pair<boost::system_time, gaggled_events_client::ProgramState> stamp
     return last_known_pid;
   }
   
+  gaggled_events_client::ProgramState get_announced_program_state() {
+    return announced_program_state;
+  }
+
 private:
   std::string name;
   int64_t last_known_pid;
@@ -326,11 +330,14 @@ const static uint8_t CHG_BETTER = 1;
 const static uint8_t CHG_WORSE = 2;
 const static uint8_t CHG_NEUT = 3;
 
-  Transition(uint8_t from, uint8_t to, std::string program, int64_t last_known_pid)
+  Transition(uint8_t from, uint8_t to, std::string program, int64_t last_known_pid, uint8_t dependencies_satisfied, std::string down_type, uint8_t is_operator_shutdown)
   : from(from)
   , to(to)
   , program(program)
   , last_known_pid(last_known_pid)
+  , dependencies_satisfied(dependencies_satisfied)
+  , down_type(down_type)
+  , is_operator_shutdown(is_operator_shutdown)
   {
     if (to == ProgramStateTracker::STATE_CHURN) {
       chg = CHG_WORSE;
@@ -370,6 +377,36 @@ const static uint8_t CHG_NEUT = 3;
         break;
     }
 
+    if (to != ProgramStateTracker::STATE_UP) {
+      bool dt = (down_type != "" and down_type != "NONE");
+      bool opd = is_operator_shutdown == 1;
+      bool dns = dependencies_satisfied == 0;
+      
+      if (dns or dt or opd) {
+        if (multiline)
+          summary += "\r\n  ";
+        else
+          summary += ", ";
+
+        summary += "due to ";
+
+        if (dt)
+          summary += down_type;
+
+        if (opd) {
+          if (dt)
+            summary += ", ";
+
+          summary += "shutdown by operator";
+        } else if (dns) {
+          if (dt)
+            summary += ", ";
+
+          summary += "dependencies not satisfied";
+        }
+      }
+    }
+
     if (from != ProgramStateTracker::STATE_NONE) {
       if (multiline)
         summary += "\r\n  ";
@@ -404,7 +441,7 @@ const static uint8_t CHG_NEUT = 3;
       else
         summary += "current pid";
       
-      summary += ": " + boost::lexical_cast<std::string>(last_known_pid); 
+      summary += ": " + boost::lexical_cast<std::string>(last_known_pid);
     }
 
 
@@ -415,6 +452,9 @@ const static uint8_t CHG_NEUT = 3;
   uint8_t to;
   std::string program;
   int64_t last_known_pid;
+  uint8_t dependencies_satisfied;
+  std::string down_type;
+  uint8_t is_operator_shutdown;
 
   uint8_t chg;
   bool verbose;
@@ -486,9 +526,9 @@ public:
         auto tracker = p->second;
         uint8_t previous_state = tracker->get_state();
         uint8_t new_state = tracker->notify(state_period);
+        auto anp = tracker->get_announced_program_state();
         if (new_state != ProgramStateTracker::STATE_NONE) {
-          auto breakdown = Transition(previous_state, new_state, program, tracker->get_last_known_pid()).breakdown();
-          std::cout << "gaggled_smtpgate: [state] " << breakdown << std::endl;
+          auto breakdown = Transition(previous_state, new_state, program, tracker->get_last_known_pid(), anp.dependencies_satisfied, anp.down_type, anp.is_operator_shutdown).breakdown();
           mail_send(from, to, prefix + breakdown, breakdown);
         }
       }
@@ -505,7 +545,8 @@ public:
         uint8_t new_state = tracker->notify(state_period);
         if (new_state != ProgramStateTracker::STATE_NONE) {
           programs_batched.insert(program);
-          transitions.push_back(Transition(previous_state, new_state, program, tracker->get_last_known_pid()));
+          auto anp = tracker->get_announced_program_state();
+          transitions.push_back(Transition(previous_state, new_state, program, tracker->get_last_known_pid(), anp.dependencies_satisfied, anp.down_type, anp.is_operator_shutdown));
         }
       }
 

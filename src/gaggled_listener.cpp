@@ -17,7 +17,7 @@ class GaggledWatcher : public gaggled_events_client::gaggled_events<GaggledWatch
     if (obj.up == 1) {
       std::cout << "[U] " << obj.program << std::endl;
     } else {
-      std::cout << "[D exp=" << int(obj.during_shutdown) << " typ=" << obj.down_type << "] " << obj.program << std::endl;
+      std::cout << "[D shutdown=" << int(obj.during_shutdown) << " dtyp=" << obj.down_type << " depsat=" << int(obj.dependencies_satisfied) << " opdown=" << int(obj.is_operator_shutdown) << "] " << obj.program << std::endl;
     }
   }
 };

@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <sysexits.h>
 #include <signal.h>
 #include <iostream>
@@ -216,6 +217,11 @@ void gaggled::Program::start(Gaggled* g) {
         exit(EX_UNAVAILABLE);
         }
     }
+
+    struct rlimit inf;
+    inf.rlim_cur = RLIM_INFINITY;
+    inf.rlim_max = RLIM_INFINITY;
+    setrlimit(RLIMIT_CORE, &inf);
 
     for (auto c = commands.begin(); c != commands.end(); c++) {
       exec_argv[0] = strdup(c->c_str());

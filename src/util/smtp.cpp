@@ -37,7 +37,7 @@ gaggled::util::SMTP::SMTP(std::string mx, std::string helo)
   :
   mx(mx),
   helo(helo),
-  total_transaction_max(boost::posix_time::milliseconds(30000))
+  total_transaction_max(boost::posix_time::milliseconds(45000))
   {
   }
 
