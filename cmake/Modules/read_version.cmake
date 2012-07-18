@@ -34,11 +34,6 @@ macro(read_version)
   # sanity check version string
   if(ver_len EQUAL 4)
     list(GET ver_list 3 ${_var_name}_BUILD)
-    # drop build octet from string if 0
-    if(${_var_name}_BUILD EQUAL 0)
-      set(${_var_name}
-        "${${_var_name}_MAJOR}.${${_var_name}_MINOR}.${${_var_name}_PATCH}")
-    endif()
 
   elseif(ver_len EQUAL 3)
     set(${_var_name}_BUILD 0)
@@ -48,6 +43,14 @@ macro(read_version)
   endif()
 
   # export version vars
+  if(${_var_name}_BUILD EQUAL 0)
+    # drop build octet from string if 0
+    set(${_var_name}
+      "${${_var_name}_MAJOR}.${${_var_name}_MINOR}.${${_var_name}_PATCH}")
+  else()
+    set(${_var_name}
+      "${${_var_name}_MAJOR}.${${_var_name}_MINOR}.${${_var_name}_PATCH}.${${_var_name}_BUILD}")
+  endif()
   MATH(EXPR ${_var_name}_NUMBER
     "(${${_var_name}_MAJOR} <<24) | (${${_var_name}_MINOR} <<16) | (${${_var_name}_PATCH} <<8) | ${${_var_name}_BUILD}" )
 

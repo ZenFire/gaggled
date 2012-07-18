@@ -457,6 +457,7 @@ void gaggled::Program::op_shutdown(gaggled::Gaggled* g) {
   operator_shutdown = true;
   this->statechanges++;
   g->broadcast_state(this);
+  g->flush_starts(this);
   new KillEvent(g, this, SIGTERM, false, false);
 }
 

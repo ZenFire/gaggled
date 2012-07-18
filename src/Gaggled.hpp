@@ -77,6 +77,7 @@ public:
   void check_deaths();
   void stop();
   bool is_running();
+  void flush_starts(Program* p);
   Program* get_program(std::string name);
 private:
   gaggled_events_server::gaggled_events* eventserver;

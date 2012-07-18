@@ -41,6 +41,7 @@ public:
   void queue();
   virtual bool handle();
   virtual std::string to_string();
+  virtual Program* get_program_pointer();
 protected:
   Gaggled* g;
   Dependency* d;

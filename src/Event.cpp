@@ -95,6 +95,10 @@ bool gaggled::Event::handle() {
   return true;
 }
 
+gaggled::Program* gaggled::Event::get_program_pointer() {
+  return p;
+}
+
 std::string gaggled::Event::to_string() {
   std::string r = "Base Event";
   return r;

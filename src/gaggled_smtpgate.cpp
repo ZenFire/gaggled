@@ -1,6 +1,7 @@
 #include <sys/time.h>
 
 #include "time.h"
+#include <unistd.h>
 
 #include <vector>
 #include <set>
@@ -491,6 +492,24 @@ public:
 
   void mail_send(std::string from, std::string to, std::string subject, std::string body) {
     try {
+      const std::string hnrpl = "__HOSTNAME__";
+      const int repllen = hnrpl.length();
+
+      // if found, replace the replace pattern with the hostname of the system.
+      auto hnpos = subject.find(hnrpl);
+      if (hnpos != std::string::npos) {
+        #define HNLIM 2048
+        char hn[HNLIM];
+        hn[HNLIM - 1] = 0; // gethostname is not required in truncating scenarios to null terminate, per POSIX.1-2001. Don't want to worry about varied glibc.
+        // same reason to avoid the last byte when calling gethostname.
+        int ghrc = gethostname(hn, HNLIM);
+        if (ghrc == 0) {
+          subject = subject.substr(0, hnpos) + std::string(hn) + subject.substr(hnpos + repllen);
+        } else {
+          std::cout << "gaggled_smtpgate: [smtp] hostname check failed, not replacing __HOSTNAME__ in email subject." << std::endl;
+        }
+      }
+
       agent.send(from, to, subject, body);
     } catch (gaggled::util::SMTPHostException& se) {
       std::cout << "gaggled_smtpgate: [smtp] unknown host" << std::endl;
@@ -666,7 +685,7 @@ void usage() {
   std::cout << "  smtpgate {" << std::endl;
   std::cout << "    mx - hostname of SMTP server" << std::endl;
   std::cout << "    helo - HELO identification to present to the server" << std::endl;
-  std::cout << "    spfix - prefix for email subjects" << std::endl;
+  std::cout << "    spfix - prefix for email subjects. The string __HOSTNAME__ will be replaced by the system hostname." << std::endl;
   std::cout << "    from - email address to send from" << std::endl;
   std::cout << "    to - email address to send to" << std::endl;
   std::cout << "  }" << std::endl;

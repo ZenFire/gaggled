@@ -461,6 +461,28 @@ bool gaggled::Gaggled::is_running() {
   return not this->stopped;
 }
 
+void gaggled::Gaggled::flush_starts(gaggled::Program* p) {
+  for (int i = 0; i != QPRI_END; i++) {
+    if (event_queues[i] == NULL)
+      continue;
+    
+    std::queue<gaggled::Event*>* new_queue = new std::queue<gaggled::Event*>();
+    while (not event_queues[i]->empty()) {
+      gaggled::Event* ev = event_queues[i]->front();
+      event_queues[i]->pop();
+      if (dynamic_cast<gaggled::StartEvent*>(ev) == NULL) {
+        new_queue->push(ev);
+      } else if (ev->get_program_pointer() != p) {
+        new_queue->push(ev);
+      } else {
+        delete ev;
+      }
+    }
+    delete event_queues[i];
+    event_queues[i] = new_queue;
+  }
+}
+
 gaggled::Program* gaggled::Gaggled::get_program(std::string name) {
   if (program_map.find(name) == program_map.end())
     throw gaggled::BadConfigException("program " + name + " does not exist.");
