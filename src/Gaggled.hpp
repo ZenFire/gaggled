@@ -109,6 +109,7 @@ public:
   uint8_t handle_start (std::string req);
   uint8_t handle_kill (std::string req);
   uint8_t handle_stop (std::string req);
+  uint8_t handle_shutdown (std::string username);
   std::vector<gaggled_control_server::ProgramState> handle_getstates (int32_t req);
 private:
   Gaggled* g;

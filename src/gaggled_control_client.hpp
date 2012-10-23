@@ -15,11 +15,12 @@ namespace gaggled_control_client {
     const uint8_t ST_AFFIRM = 0;
     const uint8_t ST_BADMSG = 1;
     const uint8_t ST_FAILED = 2;
-    const uint32_t WIRE_VERSION = 5236;
+    const uint32_t WIRE_VERSION = 5238;
     const uint32_t FNUM_GETSTATES = 1;
     const uint32_t FNUM_KILL = 2;
-    const uint32_t FNUM_START = 3;
-    const uint32_t FNUM_STOP = 4;
+    const uint32_t FNUM_SHUTDOWN = 3;
+    const uint32_t FNUM_START = 4;
+    const uint32_t FNUM_STOP = 5;
 
     class ServerBadMessage : public std::exception {
     public:
@@ -63,20 +64,6 @@ namespace gaggled_control_client {
     class gaggled_control : public rpgbase::RPGService {
     public:
      // functions
-      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        uint8_t ret;
-        if ((buf_size >= ((*(buf_offset)) + 1))) {
-          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
-          (*(buf_offset)) = ((*(buf_offset)) + 1);
-        } else {
-          throw BadMessage();
-        }
-        return ret;
-      }
-      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 1);
-      }
       uint32_t decode_uint32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         uint32_t ret;
         if ((buf_size >= ((*(buf_offset)) + 4))) {
@@ -94,6 +81,38 @@ namespace gaggled_control_client {
         outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 4);
       }
+      std::string decode_username (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        char vchar_buf[256];
+        uint32_t vchar_size;
+        std::string ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        if ((vchar_size > 255)) {
+          throw BadMessage();
+        }
+        memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
+        vchar_buf[vchar_size] = 0;
+        ret = std::string(vchar_buf);
+        (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
+        return ret;
+      }
+      void encode_username (uint8_t* outbuf, uint32_t* buf_offset, std::string obj) {
+        uint32_t lencache=((&(obj)))->length();
+        if ((lencache > 255)) {
+          throw BadMessage();
+        }
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((lencache >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((lencache >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+        memcpy(((*(buf_offset)) + outbuf), ((&(obj)))->c_str(), lencache);
+        (*(buf_offset)) = ((*(buf_offset)) + lencache);
+      }
       int32_t decode_int32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         int32_t ret;
         if ((buf_size >= ((*(buf_offset)) + 4))) {
@@ -110,6 +129,20 @@ namespace gaggled_control_client {
         outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
         outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
         (*(buf_offset)) = ((*(buf_offset)) + 4);
+      }
+      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        uint8_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 1))) {
+          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 1);
       }
       std::string decode_progname (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         char vchar_buf[256];
@@ -366,6 +399,43 @@ namespace gaggled_control_client {
         (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
         (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_KILL);
         (this)->encode_progname(msgbuf, (&(msgbuf_s)), req);
+        zmq::message_t response;
+        (this)->zmq_reqrep((&(response)));
+        uint8_t* inbound_buf=((uint8_t*)(((&(response)))->data()));
+        uint32_t inbound_bsize=((&(response)))->size();
+        uint8_t remote_rcode;
+        uint32_t response_offset=0;
+        uint32_t wv=(this)->decode_uint32_t(inbound_buf, (&(response_offset)), inbound_bsize);
+        if ((wv != WIRE_VERSION)) {
+          throw BadMessage();
+        }
+        remote_rcode = (this)->decode_uint8_t(inbound_buf, (&(response_offset)), inbound_bsize);
+        if ((remote_rcode != ST_AFFIRM)) {
+          switch (remote_rcode) {
+            case (ST_BADMSG):
+            {
+              throw ServerBadMessage();
+              break;
+            }
+            case (ST_FAILED):
+            {
+              throw ServerException();
+              break;
+            }
+            default:
+            {
+              throw ServerBadMessage();
+              break;
+            }
+          }
+        }
+        return (this)->decode_uint8_t(inbound_buf, (&(response_offset)), inbound_bsize);
+      }
+      uint8_t call_shutdown (std::string req) {
+        msgbuf_s = 0;
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), WIRE_VERSION);
+        (this)->encode_uint32_t(msgbuf, (&(msgbuf_s)), FNUM_SHUTDOWN);
+        (this)->encode_username(msgbuf, (&(msgbuf_s)), req);
         zmq::message_t response;
         (this)->zmq_reqrep((&(response)));
         uint8_t* inbound_buf=((uint8_t*)(((&(response)))->data()));

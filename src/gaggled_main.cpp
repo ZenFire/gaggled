@@ -52,15 +52,17 @@ void usage() {
   std::cout << "\t-c <file> where file is the configuration file." << std::endl;
   std::cout << "\t-h to show help." << std::endl;
   std::cout << "\t-t to only test the configuration rather than running it." << std::endl;
+  std::cout << "\t-n to disable ^c on the terminal (or SIGINT) from shutting down gaggled. Shutdown should be accomplished by sending SIGTERM in this case." << std::endl;
 }
 
 int main(int argc, char** argv) {
   char* conf_file = NULL;
   bool config_test = false;
   bool help = false;
+  bool ign_sigint = false;
 
   int c;
-  while ((c = getopt(argc, argv, "htc:")) != -1) {
+  while ((c = getopt(argc, argv, "htnc:")) != -1) {
     switch(c) {
       case 'h':
         help = true;
@@ -70,6 +72,9 @@ int main(int argc, char** argv) {
         break;
       case 'c':
         conf_file = optarg;
+        break;
+      case 'n':
+        ign_sigint = true;
         break;
       case '?':
         usage();
@@ -98,21 +103,25 @@ int main(int argc, char** argv) {
   try {
     g = new Gaggled(conf_file);
   } catch (BadConfigException& bce) {
-    std::cout << "configtest: failed, " << bce.reason << std::endl;
+    std::cout << "configtest " << conf_file << ": failed, " << bce.reason << std::endl;
     return 1;
   } catch (boost::property_tree::info_parser::info_parser_error& pe) {
-    std::cout << "configtest: parse error at " << pe.filename() << ":" << pe.line() << ": " << pe.message() << std::endl;
+    std::cout << "configtest " << conf_file << ": parse error at " << pe.filename() << ":" << pe.line() << ": " << pe.message() << std::endl;
     return 1;
   }
 
   if (config_test) {
-    std::cout << "configtest: ok" << std::endl;
+    std::cout << "configtest " << conf_file << ": ok" << std::endl;
     delete g;
     return 0;
   }
 
   signal(SIGTERM, die_callback);
-  signal(SIGINT, die_callback);
+  if (ign_sigint)
+    signal(SIGINT, SIG_IGN);
+  else 
+    signal(SIGINT, die_callback);
+
   g->run();
   delete g;
 

@@ -15,11 +15,12 @@ namespace gaggled_control_server {
     const uint8_t ST_AFFIRM = 0;
     const uint8_t ST_BADMSG = 1;
     const uint8_t ST_FAILED = 2;
-    const uint32_t WIRE_VERSION = 5236;
+    const uint32_t WIRE_VERSION = 5238;
     const uint32_t FNUM_GETSTATES = 1;
     const uint32_t FNUM_KILL = 2;
-    const uint32_t FNUM_START = 3;
-    const uint32_t FNUM_STOP = 4;
+    const uint32_t FNUM_SHUTDOWN = 3;
+    const uint32_t FNUM_START = 4;
+    const uint32_t FNUM_STOP = 5;
 
     class BadMessage : public std::exception {
     public:
@@ -46,6 +47,118 @@ namespace gaggled_control_server {
     class gaggled_control : public rpgbase::RPGService {
     public:
      // functions
+      uint32_t decode_uint32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        uint32_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          ret = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_uint32_t (uint8_t* outbuf, uint32_t* buf_offset, uint32_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+      }
+      int32_t decode_int32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        int32_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          ret = ((((int32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((int32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((int32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((int32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_int32_t (uint8_t* outbuf, uint32_t* buf_offset, int32_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+      }
+      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        uint8_t ret;
+        if ((buf_size >= ((*(buf_offset)) + 1))) {
+          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
+          (*(buf_offset)) = ((*(buf_offset)) + 1);
+        } else {
+          throw BadMessage();
+        }
+        return ret;
+      }
+      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 1);
+      }
+      std::string decode_progname (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        char vchar_buf[256];
+        uint32_t vchar_size;
+        std::string ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        if ((vchar_size > 255)) {
+          throw BadMessage();
+        }
+        memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
+        vchar_buf[vchar_size] = 0;
+        ret = std::string(vchar_buf);
+        (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
+        return ret;
+      }
+      void encode_progname (uint8_t* outbuf, uint32_t* buf_offset, std::string obj) {
+        uint32_t lencache=((&(obj)))->length();
+        if ((lencache > 255)) {
+          throw BadMessage();
+        }
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((lencache >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((lencache >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+        memcpy(((*(buf_offset)) + outbuf), ((&(obj)))->c_str(), lencache);
+        (*(buf_offset)) = ((*(buf_offset)) + lencache);
+      }
+      std::string decode_username (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
+        char vchar_buf[256];
+        uint32_t vchar_size;
+        std::string ret;
+        if ((buf_size >= ((*(buf_offset)) + 4))) {
+          vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
+          (*(buf_offset)) = ((*(buf_offset)) + 4);
+        } else {
+          throw BadMessage();
+        }
+        if ((vchar_size > 255)) {
+          throw BadMessage();
+        }
+        memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
+        vchar_buf[vchar_size] = 0;
+        ret = std::string(vchar_buf);
+        (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
+        return ret;
+      }
+      void encode_username (uint8_t* outbuf, uint32_t* buf_offset, std::string obj) {
+        uint32_t lencache=((&(obj)))->length();
+        if ((lencache > 255)) {
+          throw BadMessage();
+        }
+        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((lencache >> 24) & 255)));
+        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((lencache >> 16) & 255)));
+        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache >> 8) & 255)));
+        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache >> 0) & 255)));
+        (*(buf_offset)) = ((*(buf_offset)) + 4);
+        memcpy(((*(buf_offset)) + outbuf), ((&(obj)))->c_str(), lencache);
+        (*(buf_offset)) = ((*(buf_offset)) + lencache);
+      }
       std::vector<ProgramState> decode_ProgramStateList (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
         char vchar_buf[256];
         uint32_t vchar_size;
@@ -204,86 +317,6 @@ namespace gaggled_control_server {
           (*(buf_offset)) = ((*(buf_offset)) + 8);
         }
       }
-      std::string decode_progname (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        char vchar_buf[256];
-        uint32_t vchar_size;
-        std::string ret;
-        if ((buf_size >= ((*(buf_offset)) + 4))) {
-          vchar_size = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
-          (*(buf_offset)) = ((*(buf_offset)) + 4);
-        } else {
-          throw BadMessage();
-        }
-        if ((vchar_size > 255)) {
-          throw BadMessage();
-        }
-        memcpy(vchar_buf, ((*(buf_offset)) + inbuf), vchar_size);
-        vchar_buf[vchar_size] = 0;
-        ret = std::string(vchar_buf);
-        (*(buf_offset)) = ((*(buf_offset)) + vchar_size);
-        return ret;
-      }
-      void encode_progname (uint8_t* outbuf, uint32_t* buf_offset, std::string obj) {
-        uint32_t lencache=((&(obj)))->length();
-        if ((lencache > 255)) {
-          throw BadMessage();
-        }
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((lencache >> 24) & 255)));
-        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((lencache >> 16) & 255)));
-        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((lencache >> 8) & 255)));
-        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((lencache >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 4);
-        memcpy(((*(buf_offset)) + outbuf), ((&(obj)))->c_str(), lencache);
-        (*(buf_offset)) = ((*(buf_offset)) + lencache);
-      }
-      uint8_t decode_uint8_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        uint8_t ret;
-        if ((buf_size >= ((*(buf_offset)) + 1))) {
-          ret = (((uint8_t)(inbuf[((*(buf_offset)) + 0)])) << 0);
-          (*(buf_offset)) = ((*(buf_offset)) + 1);
-        } else {
-          throw BadMessage();
-        }
-        return ret;
-      }
-      void encode_uint8_t (uint8_t* outbuf, uint32_t* buf_offset, uint8_t obj) {
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 1);
-      }
-      uint32_t decode_uint32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        uint32_t ret;
-        if ((buf_size >= ((*(buf_offset)) + 4))) {
-          ret = ((((uint32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((uint32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((uint32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((uint32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
-          (*(buf_offset)) = ((*(buf_offset)) + 4);
-        } else {
-          throw BadMessage();
-        }
-        return ret;
-      }
-      void encode_uint32_t (uint8_t* outbuf, uint32_t* buf_offset, uint32_t obj) {
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
-        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
-        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
-        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 4);
-      }
-      int32_t decode_int32_t (uint8_t* inbuf, uint32_t* buf_offset, uint32_t buf_size) {
-        int32_t ret;
-        if ((buf_size >= ((*(buf_offset)) + 4))) {
-          ret = ((((int32_t)(inbuf[((*(buf_offset)) + 0)])) << 24) + ((((int32_t)(inbuf[((*(buf_offset)) + 1)])) << 16) + ((((int32_t)(inbuf[((*(buf_offset)) + 2)])) << 8) + (((int32_t)(inbuf[((*(buf_offset)) + 3)])) << 0))));
-          (*(buf_offset)) = ((*(buf_offset)) + 4);
-        } else {
-          throw BadMessage();
-        }
-        return ret;
-      }
-      void encode_int32_t (uint8_t* outbuf, uint32_t* buf_offset, int32_t obj) {
-        outbuf[((*(buf_offset)) + 0)] = ((uint8_t)(((obj >> 24) & 255)));
-        outbuf[((*(buf_offset)) + 1)] = ((uint8_t)(((obj >> 16) & 255)));
-        outbuf[((*(buf_offset)) + 2)] = ((uint8_t)(((obj >> 8) & 255)));
-        outbuf[((*(buf_offset)) + 3)] = ((uint8_t)(((obj >> 0) & 255)));
-        (*(buf_offset)) = ((*(buf_offset)) + 4);
-      }
       void recv_request (uint8_t* inbuf, uint32_t buf_size, uint8_t* outbuf, uint32_t* buf_offset) {
         uint32_t decode_offset=0;
         uint32_t wv=(this)->decode_uint32_t(inbuf, (&(decode_offset)), buf_size);
@@ -332,17 +365,36 @@ namespace gaggled_control_server {
             }
             break;
           }
-          case FNUM_START:
+          case FNUM_SHUTDOWN:
           {
             std::string request_3;
             try {
-              request_3 = (this)->decode_progname(inbuf, (&(decode_offset)), buf_size);
+              request_3 = (this)->decode_username(inbuf, (&(decode_offset)), buf_size);
             } catch (...) {
               (this)->encode_uint8_t(outbuf, buf_offset, ST_BADMSG);
               return;
             }
             try {
-              uint8_t response=(static_cast<implementation_child_type*>(this))->handle_start(request_3);
+              uint8_t response=(static_cast<implementation_child_type*>(this))->handle_shutdown(request_3);
+              (this)->encode_uint8_t(outbuf, buf_offset, ST_AFFIRM);
+              (this)->encode_uint8_t(outbuf, buf_offset, response);
+            } catch (...) {
+              (*(buf_offset)) = 4;
+              (this)->encode_uint8_t(outbuf, buf_offset, ST_FAILED);
+            }
+            break;
+          }
+          case FNUM_START:
+          {
+            std::string request_4;
+            try {
+              request_4 = (this)->decode_progname(inbuf, (&(decode_offset)), buf_size);
+            } catch (...) {
+              (this)->encode_uint8_t(outbuf, buf_offset, ST_BADMSG);
+              return;
+            }
+            try {
+              uint8_t response=(static_cast<implementation_child_type*>(this))->handle_start(request_4);
               (this)->encode_uint8_t(outbuf, buf_offset, ST_AFFIRM);
               (this)->encode_uint8_t(outbuf, buf_offset, response);
             } catch (...) {
@@ -353,15 +405,15 @@ namespace gaggled_control_server {
           }
           case FNUM_STOP:
           {
-            std::string request_4;
+            std::string request_5;
             try {
-              request_4 = (this)->decode_progname(inbuf, (&(decode_offset)), buf_size);
+              request_5 = (this)->decode_progname(inbuf, (&(decode_offset)), buf_size);
             } catch (...) {
               (this)->encode_uint8_t(outbuf, buf_offset, ST_BADMSG);
               return;
             }
             try {
-              uint8_t response=(static_cast<implementation_child_type*>(this))->handle_stop(request_4);
+              uint8_t response=(static_cast<implementation_child_type*>(this))->handle_stop(request_5);
               (this)->encode_uint8_t(outbuf, buf_offset, ST_AFFIRM);
               (this)->encode_uint8_t(outbuf, buf_offset, response);
             } catch (...) {
@@ -382,6 +434,10 @@ namespace gaggled_control_server {
         return ret;
       }
       uint8_t handle_kill (std::string req) {
+        uint8_t ret;
+        return ret;
+      }
+      uint8_t handle_shutdown (std::string req) {
         uint8_t ret;
         return ret;
       }
@@ -426,10 +482,19 @@ namespace gaggled_control_server {
       void run_once_bare () {
         zmq::message_t req;
         (sock)->recv((&(req)));
-        (this)->recv_request(((uint8_t*)(((&(req)))->data())), ((&(req)))->size(), ((uint8_t*)(msgbuf)), (&(msgbuf_s)));
+        bool bmsg=false;
+        try {
+          (this)->recv_request(((uint8_t*)(((&(req)))->data())), ((&(req)))->size(), ((uint8_t*)(msgbuf)), (&(msgbuf_s)));
+        } catch (BadMessage& bme) {
+          bmsg = true;
+          (this)->encode_uint8_t(((uint8_t*)(msgbuf)), (&(msgbuf_s)), ST_BADMSG);
+        }
         zmq::message_t resp(msgbuf_s);
         memcpy(((&(resp)))->data(), msgbuf, msgbuf_s);
         (sock)->send(resp);
+        if (bmsg) {
+          throw BadMessage();
+        }
       }
      // members
       bool ctx_created;

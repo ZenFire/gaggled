@@ -255,7 +255,7 @@ void gaggled::Gaggled::parse_config(char* conf_file) {
   // overlay environments and do $PATH searches
   for (auto p = this->programs.begin(); p != this->programs.end(); p++) {
     (*p)->overlay_environment(env_map);
-    if (not (*p)->search(&(this->paths)))
+    if (not (*p)->is_operator_shutdown() and not (*p)->search(&(this->paths)))
       throw gaggled::BadConfigException("program " + (*p)->get_command() + " not found, not a file, or not executable");
   }
 
@@ -297,6 +297,15 @@ uint8_t gaggled::GaggledController::handle_stop (std::string req) {
     p->op_shutdown(g);
     return 0;
   } catch (BadConfigException& bce) {
+    return 1;
+  }
+}
+uint8_t gaggled::GaggledController::handle_shutdown (std::string username) {
+  if (g->is_running()) {
+    std::cout << "[ctrl] shutting down due to request from user " << username << std::endl;
+    g->stop();
+    return 0;
+  } else {
     return 1;
   }
 }

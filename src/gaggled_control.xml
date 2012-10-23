@@ -1,7 +1,8 @@
 <protocol module="gaggled_control" type="reqrep" timeout="yes">
-  <wire version="5236" />
+  <wire version="5238" />
 
   <varchar name="progname" max="255" />
+  <varchar name="username" max="255" />
   <varchar name="exitconst" max="4" />
 
   <complex name="ProgramState">
@@ -21,5 +22,6 @@
   <function name="start" in="progname" out="uint8_t" />
   <function name="kill" in="progname" out="uint8_t" />
   <function name="stop" in="progname" out="uint8_t" />
+  <function name="shutdown" in="username" out="uint8_t" />
   <function name="getstates" in="int32_t" out="ProgramStateList" />
 </protocol>
