@@ -255,7 +255,7 @@ void gaggled::Gaggled::parse_config(char* conf_file) {
   // overlay environments and do $PATH searches
   for (auto p = this->programs.begin(); p != this->programs.end(); p++) {
     (*p)->overlay_environment(env_map);
-    if (not (*p)->is_operator_shutdown() and not (*p)->search(&(this->paths)))
+    if (not (*p)->search(&(this->paths)) and not (*p)->is_operator_shutdown())
       throw gaggled::BadConfigException("program " + (*p)->get_command() + " not found, not a file, or not executable");
   }
 

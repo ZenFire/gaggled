@@ -769,6 +769,7 @@ int main(int argc, char** argv) {
   }
 
   if (!(gw->got_response)) {
+    // TODO send heartbeat over gaggled event channel to allow smtpgate to converge in a decidable way?
     std::cout << "gaggled_smtpgate: error: it appears that the eventurl channel did not start within 5-10 seconds, aborting." << std::endl << std::flush;
     std::exit(1);
   } else {
