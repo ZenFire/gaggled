@@ -127,6 +127,24 @@ void gaggled::Gaggled::read_env_config(boost::property_tree::ptree& pt, std::map
     }
 }
 
+std::string gaggled::Gaggled::zmq_url_hostname_insert(const std::string& url, const std::string& hostname) {
+  // example - tcp://*:3456 is url, box.example.com is hostname
+  // in this situation we want to produce tcp://box.example.com:3456.
+  
+  const std::string needle = "://*:";
+
+  auto loc = url.find(needle);
+  auto nlen = needle.length();
+  
+  if (loc == std::string::npos) {
+    return url;
+  } else {
+    const std::string suture = "://" + hostname + ":";
+    
+    return url.substr(0, loc) + suture + url.substr(loc + nlen);
+  }
+}
+
 #define SMTP_CONFIGTEST_FAIL(msg) throw gaggled::BadConfigException(msg);
 
 void gaggled::Gaggled::parse_config(char* conf_file) {
@@ -222,6 +240,29 @@ void gaggled::Gaggled::parse_config(char* conf_file) {
         read_env_config(*env_o, &own_env);
       }
 
+      // overlay built in gaggled environment variables over without allowing override here.
+      own_env["GAGGLED_PROGRAM_NAME"] = name;
+      
+      #define HNLIM 2048
+      char hn[HNLIM];
+      hn[HNLIM - 1] = 0; // gethostname is not required in truncating scenarios to null terminate, per POSIX.1-2001. Don't want to worry about varied glibc.
+      // same reason to avoid the last byte when calling gethostname.
+      int ghrc = gethostname(hn, HNLIM);
+      if (ghrc == 0) {
+        own_env["GAGGLED_HOST"] = std::string(hn);
+      } else {
+        // fallback to env var HOSTNAME
+        char* hnp = getenv("HOSTNAME");
+        if (hnp == NULL) {
+          own_env["GAGGLED_HOST"] = "";
+        } else {
+          own_env["GAGGLED_HOST"] = std::string(hnp);
+        }
+      }
+      
+      own_env["GAGGLED_EVENT_URL"] = zmq_url_hostname_insert(this->eventurl, own_env["GAGGLED_HOST"]);
+      own_env["GAGGLED_CONTROL_URL"] = zmq_url_hostname_insert(this->controlurl, own_env["GAGGLED_HOST"]);
+      
       Program* p = new Program(name, command, argv_vec, own_env, wd, respawn, enabled);
       this->programs.push_back(p);
       this->program_map[name] = p;

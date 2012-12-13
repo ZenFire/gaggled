@@ -148,7 +148,7 @@ void gaggled::Program::overlay_environment(std::map<std::string, std::string> gl
   }
   exec_env[global_environment.size()] = NULL;
 
-  own_env = global_environment; //now that we've overlaid it...
+  own_env = global_environment; //now that we've overlaid it... save it.
 }
 
 std::string gaggled::Program::to_string() {

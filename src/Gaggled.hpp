@@ -99,6 +99,7 @@ private:
   void write_state(gaggled_control_server::ProgramState& sc, Program* p);
   void broadcast_state(Program* p);
   void read_env_config(boost::property_tree::ptree& pt, std::map<std::string, std::string>* write_to);
+  std::string zmq_url_hostname_insert(const std::string& url, const std::string& hostname);
   void parse_config(char* conf_file);
   void clean_up();
 };
